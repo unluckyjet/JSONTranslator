@@ -1,6 +1,6 @@
 # Baseline gallery
 
-Eight figures covering every branch of the emitter. Each one is built by POSTing a spec to the
+Fourteen figures covering every branch of the emitter. Each one is built by POSTing a spec to the
 deployed API, running the Python that comes back, and committing both. The code and the images are
 version controlled, so changing the emitter shows up as a reviewable diff instead of a surprise in
 someone's paper.
@@ -32,6 +32,12 @@ reasons. `generated/` holds the Python the API returned. `baseline/` holds the r
 | `06-accuracy-vs-latency` | grouped scatter, emphasis |
 | `07-params-trendline` | ungrouped scatter with a linear fit |
 | `08-compact-double-column` | compact preset, double column, grid, explicit y limits |
+| `09-uncertainty-band` | bootstrap confidence band, chance line, annotation at the maximum |
+| `10-faceted-benchmarks` | panels with letters, shared y, one legend, value labels |
+| `11-seed-spread` | box plot, row filtering, sorted by value |
+| `12-sweep-heatmap` | heatmap with a labelled colourbar and annotated cells |
+| `13-direct-labels` | series named at the end of their lines instead of a legend box |
+| `14-animated-curve` | the same curve drawing itself as a gif |
 
 ## Why the images are committed
 

@@ -27,29 +27,78 @@ vermillion land 0.07 apart in relative luminance, under the 0.10 a reader needs.
 palette does not save it. Of all 40,320 orderings the best still leaves four series 0.094 apart.
 Hatching does save it, at any number of series.
 
-The spec behind the chart:
+![Training curves for four models with bootstrap confidence bands, a chance line and an annotation](docs/uncertainty-band.png)
+
+*What a spec buys you now*
+
+Mean over three seeds with a 95% bootstrap interval, the chance line labelled where it sits, and
+"best" attached to the maximum. The spec says `at: "max"`, never a pixel offset, and the script
+works out where that lands because only the script has the data.
+
+The spec behind it:
 
 ```json
 {
-  "kind": "bar",
-  "title": "Favourite ice cream flavour",
-  "x": { "field": "flavour", "label": "Flavour" },
-  "y": { "field": "votes", "label": "Votes" },
-  "group": "age_group",
-  "series_order": ["Kids", "Adults"],
+  "kind": "line",
+  "x": { "field": "epoch", "label": "Training epoch" },
+  "y": { "field": "accuracy", "label": "Test accuracy", "unit": "%" },
+  "group": "model",
   "aggregation": "mean",
-  "orientation": "horizontal",
-  "legend": { "position": "lower_right", "title": "Age group" }
+  "uncertainty": { "kind": "ci", "level": 0.95, "over": "seed", "display": "band" },
+  "series_order": ["baseline", "+augment", "+distill", "ours"],
+  "emphasis": { "series": "ours" },
+  "reference_lines": [{ "axis": "y", "value": 25, "meaning": "chance", "label": "chance" }],
+  "annotate": [{ "at": "max", "series": "ours", "text": "best" }]
 }
 ```
 
-`series_order` pins colour assignment so a model keeps its colour across every figure.
-`aggregation` collapses repeated x values, which is what a curve over several seeds needs.
+Line, scatter, bar, box, violin and heatmap. Faceting into panels, Pareto frontiers, stacked bars,
+smoothing, sorting, filtering, derived values, direct labelling, and venue presets that set the
+column width and font floor from the real submission guides.
 
-Your data never leaves your machine. You get back a script that reads your own CSV.
+## Writing a spec
+
+Do not guess at the data. Ask it:
+
+```bash
+pip install ./python
+graphunslopify describe results.csv
+```
+
+That reports the columns, their roles, how many distinct values each has, and whether x repeats per
+series, along with a starting spec. On the example data it picks `epoch` over `seed` as the x axis
+and adds the aggregation and confidence interval the repeats require.
+
+`list_recipes` has eleven known-good specs to start from, including `training_curve`, `pareto`,
+`confusion_matrix` and `faceted_curves`. `validate_spec` checks one without generating anything.
+
+## Connecting
 
 ```bash
 claude mcp add --transport http graph-unslopify https://json-translator-three.vercel.app/api/mcp
 ```
 
-`docs/research.md` explains what each check is for. `examples/README.md` covers the baseline gallery.
+Your data never leaves your machine. You get back a script that reads your own CSV.
+
+## Animation
+
+Set `animate` and the same figure draws itself.
+
+```json
+{ "animate": { "style": "draw", "duration_s": 4, "easing": "smooth", "format": "gif" } }
+```
+
+Built on matplotlib, not manim. Manim wants cairo, ffmpeg and often LaTeX, and draws its own axes
+rather than the ones this spent so long getting right. What makes those animations read well is
+easing and staged construction, and both are a few lines over `FuncAnimation`. The rate functions
+are ports of manim's and keep its names.
+
+## What checks the work
+
+Forty-one rules run on the spec alone, on the server. The rendered figure is checked separately by
+the Python package, which measures text at the width it will be printed, finds colliding tick
+labels, a legend covering data, series a reader cannot separate, series that merge in greyscale, a
+truncated bar axis, and panels that disagree.
+
+`docs/research.md` maps every rule to the paper or policy behind it. `examples/README.md` covers the
+gallery and why its images are committed.

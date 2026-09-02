@@ -240,7 +240,7 @@ def decorate_panel(ax, frame, panel_label, show_x=True, show_y=True):
         linestyle=":",
         linewidth=1,
         zorder=0,
-        label="chance",
+        label=None,
     )
     ax.annotate(
         "chance",

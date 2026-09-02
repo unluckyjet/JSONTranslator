@@ -67,6 +67,20 @@ an image, so the script is the reproducibility record. On top of that each scrip
 version and a spec hash, embeds the full spec in the PNG, SVG and PDF metadata, and prints a
 methods sentence ready to paste.
 
+## Uncertainty, which was the biggest gap
+
+The tool could plot a mean over seeds and throw the spread away silently, which is arguably worse
+than not aggregating at all. `uncertainty` now covers standard deviation, standard error, a
+percentile bootstrap interval, interquartile range and full range.
+
+The interval is a bootstrap rather than a t interval, so the script needs numpy and nothing else and
+makes no assumption about the shape of the distribution over seeds. It is seeded, so the same data
+gives the same band twice.
+
+Four lint rules keep the statistics honest: uncertainty without aggregation, an interquartile range
+around a mean, a standard deviation around a median, and a shaded band across categories, which
+implies a continuity between them that does not exist.
+
 ## Chart type confusion
 
 The largest single error class in generated charts is sub-chart-type confusion at 23%, mostly
