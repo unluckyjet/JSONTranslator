@@ -240,6 +240,31 @@ test("repair reports an unparseable spec instead of throwing", () => {
   assert.ok(result.remaining.some((r) => r.code === "invalid_spec"));
 });
 
+test("an emphasised series does not share a channel with series zero", () => {
+  const result = translated({
+    ...line,
+    series_order: ["a", "b", "c", "d"],
+    emphasis: { series: "d" },
+  });
+  // Non-emphasised series skip the plain form, which the emphasised one takes.
+  assert.match(result.code, /rest = LINE_STYLES\[1:\]/);
+  assert.match(result.code, /channel = rest\[index % len\(rest\)\]/);
+});
+
+test("with no emphasis the full cycle is used", () => {
+  const result = translated({ ...line, series_order: ["a", "b", "c"] });
+  assert.match(result.code, /elif EMPHASIS is None:/);
+  assert.match(result.code, /channel = LINE_STYLES\[index % len\(LINE_STYLES\)\]/);
+});
+
+test("a horizontal reference label sits away from where the data ends", () => {
+  const result = translated({
+    ...line,
+    reference_lines: [{ axis: "y", value: 50, label: "chance" }],
+  });
+  assert.match(result.code, /xy=\(0\.01, 50\)/);
+});
+
 // --- outputs --------------------------------------------------------------
 
 test("latex output carries the column width the size implies", () => {

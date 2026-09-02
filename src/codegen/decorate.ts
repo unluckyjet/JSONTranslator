@@ -348,17 +348,22 @@ export function emitDecoratePanel(spec: FigureSpec, out: string[]): void {
       "    )",
     );
     if (line.label) {
-      const xy = line.axis === "y" ? `(1.0, ${line.value})` : `(${line.value}, 1.0)`;
+      // A vertical line's label goes at the bottom. Putting it at the top of the
+      // axes lands it on the title, which is where this used to collide.
+      const vertical = line.axis === "x";
+      // Horizontal line labels sit on the left. Data and its annotations pile up
+      // at the right, where the last point is.
+      const xy = vertical ? `(${line.value}, 0.02)` : `(0.01, ${line.value})`;
       out.push(
         "    ax.annotate(",
         `        ${pyStr(line.label)},`,
         `        xy=${xy},`,
-        line.axis === "y"
-          ? "        xycoords=ax.get_yaxis_transform(),"
-          : "        xycoords=ax.get_xaxis_transform(),",
-        "        xytext=(-2, 2),",
+        vertical
+          ? "        xycoords=ax.get_xaxis_transform(),"
+          : "        xycoords=ax.get_yaxis_transform(),",
+        "        xytext=(3, 3),",
         '        textcoords="offset points",',
-        line.axis === "y" ? '        ha="right",' : '        ha="left",',
+        '        ha="left",',
         '        va="bottom",',
         "        fontsize=ANNOTATION_PT - 1,",
         `        color=${style.colour},`,

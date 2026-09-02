@@ -199,6 +199,28 @@ def test_room_to_breathe_produces_no_collision():
     assert "tick_labels_collide" not in codes(fig)
 
 
+def test_a_label_landing_on_the_title_is_caught():
+    fig, ax = plt.subplots(figsize=(4, 3))
+    ax.plot([1, 2, 3], [1, 2, 3])
+    ax.set_title("A fairly long chart title")
+    # Deliberately placed where the title sits.
+    ax.annotate(
+        "A fairly long chart title",
+        xy=(0.5, 1.02),
+        xycoords="axes fraction",
+        ha="center",
+    )
+    assert "labels_collide" in codes(fig)
+
+
+def test_well_spaced_labels_do_not_collide():
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot([1, 2, 3], [1, 2, 3])
+    ax.set_title("Title")
+    ax.annotate("note", xy=(1, 1), xytext=(4, 4), textcoords="offset points")
+    assert "labels_collide" not in codes(fig)
+
+
 # --- occlusion ------------------------------------------------------------
 
 

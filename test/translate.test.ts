@@ -166,7 +166,8 @@ test("a second visual channel appears once colour stops being enough", () => {
   assert.match(few.code, /SECOND_CHANNEL_THRESHOLD = 1/);
   assert.match(few.code, /LINE_STYLES = \["-", "--", "-\.", ":"\]/);
   for (const code of [few.code, many.code]) {
-    assert.match(code, /channel = LINE_STYLES\[index % len\(LINE_STYLES\)\] if total > SECOND_CHANNEL_THRESHOLD/);
+    assert.match(code, /if total <= SECOND_CHANNEL_THRESHOLD:/);
+    assert.match(code, /channel = LINE_STYLES\[index % len\(LINE_STYLES\)\]/);
     assert.match(code, /linestyle=style\["linestyle"\]/);
   }
 });

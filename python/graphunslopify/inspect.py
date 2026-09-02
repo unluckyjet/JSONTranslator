@@ -126,6 +126,55 @@ def _check_tick_collisions(axes: Any, renderer: Any, report: Report) -> None:
                 break
 
 
+def _check_text_collisions(figure: Any, renderer: Any, report: Report) -> None:
+    """Any two pieces of text landing on each other, not only tick labels.
+
+    Annotations, reference line labels and the title are placed independently,
+    so nothing stops them overlapping. A label sitting on the title renders
+    perfectly and is unreadable, which is the class of defect this whole package
+    exists to catch.
+    """
+    boxes: list[tuple[str, Any]] = []
+    for artist in _visible_texts(figure):
+        # Tick labels have their own check, which knows they come in a row.
+        if getattr(artist, "_gu_is_tick", False):
+            continue
+        try:
+            box = artist.get_window_extent(renderer)
+        except (ValueError, RuntimeError):
+            continue
+        if box.width <= 0 or box.height <= 0:
+            continue
+        boxes.append((artist.get_text(), box))
+
+    ticks = set()
+    for axes in figure.get_axes():
+        for label in list(axes.get_xticklabels()) + list(axes.get_yticklabels()):
+            ticks.add(id(label))
+    boxes = [
+        (text, box)
+        for (text, box), artist in zip(boxes, [a for a in _visible_texts(figure)])
+        if id(artist) not in ticks
+    ]
+
+    for i in range(len(boxes)):
+        for j in range(i + 1, len(boxes)):
+            left, right = boxes[i], boxes[j]
+            if not _overlaps(left[1], right[1]):
+                continue
+            overlap_w = min(left[1].x1, right[1].x1) - max(left[1].x0, right[1].x0)
+            overlap_h = min(left[1].y1, right[1].y1) - max(left[1].y0, right[1].y0)
+            smaller = min(left[1].width * left[1].height, right[1].width * right[1].height)
+            if smaller <= 0 or (overlap_w * overlap_h) / smaller < 0.12:
+                continue
+            report.add(
+                "error",
+                "labels_collide",
+                f'"{left[0]}" and "{right[0]}" are drawn on top of each other.',
+            )
+            return
+
+
 def _data_points_in_display(axes: Any, renderer: Any) -> list[Any]:
     """Display-space points and patch boxes a legend could be sitting on."""
     from matplotlib.collections import PathCollection
@@ -416,5 +465,6 @@ def inspect_figure(
         _check_truncated_bars(axes, report)
         _check_exaggeration(axes, report)
 
+    _check_text_collisions(figure, renderer, report)
     _check_panel_consistency(figure, report)
     return report
