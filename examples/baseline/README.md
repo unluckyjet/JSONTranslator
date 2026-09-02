@@ -1,7 +1,8 @@
 # Baseline gallery
 
-Rendered from `examples/specs` through https://json-translator-three.vercel.app.
-Regenerate with `node scripts/baseline.ts`, then look at the image diff.
+Rendered from `examples/specs` by the emitter in this working tree.
+Regenerate with `npm run baseline`, then look at the image diff.
+`npm run baseline -- --check` reports emitter drift without needing Python.
 
 | Spec | Kind | Findings |
 | --- | --- | --- |
