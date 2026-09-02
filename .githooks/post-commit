@@ -1,5 +1,11 @@
 #!/bin/sh
 # Push every commit as soon as it is made.
+#
+# Not active until you opt in, because a hook that pushes on every commit is a
+# choice rather than a default:
+#
+#   git config core.hooksPath .githooks
+#
 # Never fail the commit: a commit that already happened must not be undone by a
 # network problem, so every failure here is reported and swallowed.
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0

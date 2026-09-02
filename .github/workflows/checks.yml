@@ -1,0 +1,53 @@
+name: checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      # Proves the committed gallery still matches the emitter. Needs no Python.
+      - run: npm run baseline -- --check
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check python
+      - run: ruff format --check python
+      - run: pip install -e "./python[dev]"
+      - run: python -m pytest python/tests -q
+
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: pip install -r requirements.txt
+      - run: pip install -e ./python
+      # The checks that need a real matplotlib, so a script that emits but does
+      # not run cannot pass.
+      - run: npm run render-check
+      - run: npm run recipe-check
+      - run: npm run compose-check
