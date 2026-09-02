@@ -54,9 +54,9 @@ for (const model of MODELS) {
 write("results.csv", results);
 
 const ablation = ["variant,accuracy"];
-for (const variant of ["full", "no augment", "no distill", "no both"]) {
+const ABLATION = { full: 82, "no augment": 78, "no distill": 76, "no both": 70 };
+for (const [variant, base] of Object.entries(ABLATION)) {
   for (let run = 0; run < 4; run += 1) {
-    const base = { full: 82, "no augment": 78, "no distill": 76, "no both": 70 }[variant]!;
     ablation.push(`${variant},${(base + (next() - 0.5) * 3).toFixed(2)}`);
   }
 }
