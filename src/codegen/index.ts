@@ -352,16 +352,27 @@ function emitMain(spec: FigureSpec, out: string[]): void {
     spec.repeat
       ? '            globals()["Y_FIELD"] = name'
       : "            # one panel per facet value",
+    ...(spec.repeat ? ['            letter_override = pretty(name)'] : []),
     "            draw_panel(ax, block)",
     spec.layers?.length ? "            draw_layers(ax, block)" : "            # no extra layers",
     spec.inset ? "            add_inset(ax, block)" : "            # no inset requested",
-    letters
-      ? '            letter = f"({chr(ord(chr(97)) + index)}) {name}" if name is not None else None'
-      : "            letter = str(name) if name is not None else None",
-    spec.repeat ? "            ax.set_ylabel(str(name))" : "            # y label comes from the spec",
+    spec.repeat
+      ? '            letter = f"({chr(ord(chr(97)) + index)}) {letter_override}"'
+      : letters
+        ? '            letter = f"({chr(ord(chr(97)) + index)}) {name}" if name is not None else None'
+        : "            letter = str(name) if name is not None else None",
+    "            # y label comes from the spec, or from the metric when repeating",
     "            show_x = (index // columns) == rows - 1 or not SHARE_X",
     "            show_y = (index % columns) == 0 or not SHARE_Y",
     "            decorate_panel(ax, block, letter, show_x, show_y)",
+    ...(spec.repeat
+      ? [
+          "            # Each repeated panel is a different metric, so the spec's",
+          "            # own y label and unit do not apply to any of them.",
+          "            ax.set_ylabel(pretty(name))",
+          "            ax.set_title(None)",
+        ]
+      : []),
     "            # One legend for the whole figure; repeating it wastes panel space.",
     "            if index == 0:",
     "                add_legend(fig, ax, block)",

@@ -193,6 +193,14 @@ export function emitRepeat(spec: FigureSpec, out: string[]): void {
   if (!spec.repeat) return;
   out.push(
     "",
+    "def pretty(field):",
+    '    """A column name as a label. latency_ms becomes Latency ms."""',
+    '    words = str(field).replace("_", " ").replace("-", " ").strip()',
+    "    return words[:1].upper() + words[1:] if words else str(field)",
+    "",
+  );
+  out.push(
+    "",
     "def repeated_panels(df):",
     "    # One panel per metric. The y field is swapped per panel, which is the",
     "    # difference between repeat and facet: facet splits rows, this splits",

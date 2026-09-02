@@ -286,6 +286,14 @@ test("repeat swaps the y field per panel", () => {
   assert.match(result.code, /globals\(\)\["Y_FIELD"\] = name/);
 });
 
+test("repeated panels are labelled by their own metric", () => {
+  const result = translated({ ...line, repeat: { fields: ["accuracy", "loss"], columns: 2 } });
+  // The spec's y label and unit belong to none of the repeated metrics.
+  assert.match(result.code, /def pretty\(field\)/);
+  assert.match(result.code, /ax\.set_ylabel\(pretty\(name\)\)/);
+  assert.match(result.code, /letter_override = pretty\(name\)/);
+});
+
 test("a cut axis takes its own path through main", () => {
   const result = translated({ ...line, axis_break: { axis: "y", from: 30, to: 60 } });
   assert.match(result.code, /def draw_with_break/);
