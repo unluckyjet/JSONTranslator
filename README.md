@@ -1,46 +1,68 @@
 # GraphUnslopify
 
-An MCP server that will turn JSON plot specifications into matplotlib code.
+An MCP server that turns a semantic figure specification into runnable matplotlib code.
 
 Live at [json-translator-three.vercel.app](https://json-translator-three.vercel.app).
 
-It does not do that yet. Right now it accepts JSON and answers `json successfully passed` with a
-description of what arrived. That sounds trivial, and the acknowledgement is, but the part worth
-having is underneath it. The MCP transport, the tool registration, and the input handling all work,
-so the generator drops into a slot that is already wired.
+An agent says what the figure means. The generator decides how it is drawn. There is no colour, no
+line width, and no font size anywhere in the spec, and that is the whole point. If an agent could
+set them, every figure in your paper would disagree with every other one.
 
-## Endpoints
+Your data never leaves your machine. The tool hands back a Python script that reads your own CSV,
+so there is nothing to upload and nothing stored.
 
-| Path | Method | Purpose |
-| --- | --- | --- |
-| `/api/mcp` | GET, POST, DELETE | MCP Streamable HTTP |
-| `/api/convert` | POST | Same behaviour without MCP, for curl |
-| `/api/health` | GET | Liveness, and a list of these endpoints |
+## The tool
 
-## The pass_json tool
-
-One argument, `payload`, holding any JSON value. A JSON-encoded string works too, because clients
-disagree about whether to parse tool arguments before sending them and I would rather accept both
-than make you guess.
-
-The reply:
+`figure_to_matplotlib` takes a `spec` and returns two things. A runnable script, and a list of
+problems found in the spec before anything was drawn.
 
 ```json
 {
-  "ok": true,
-  "message": "json successfully passed",
-  "shape": { "kind": "object", "keys": ["kind", "x", "y"] },
-  "bytes": 42,
-  "receivedAt": "2026-09-01T12:00:00.000Z"
+  "kind": "line",
+  "x": { "field": "epoch", "label": "Training epoch" },
+  "y": { "field": "accuracy", "label": "Test accuracy", "unit": "%" },
+  "group": "model",
+  "aggregation": "mean",
+  "series_order": ["baseline", "ours"],
+  "emphasis": { "series": "ours" },
+  "legend": { "position": "outside_right" },
+  "data": { "path": "results.csv", "columns": ["epoch", "accuracy", "model"] }
 }
 ```
 
-`shape` exists so you can tell at a glance whether the payload survived the trip intact. Once the
-generator lands, that field is where the parsed plot spec will report itself.
+Only `kind`, `x`, and `y` are required. Defaults land on single-column width, 600 dpi, PNG plus SVG
+plus PDF, no grid, and the top and right spines removed.
+
+Three fields carry most of the value. `series_order` pins colour assignment, so a model is the same
+colour in figure 2 as it was in figure 1. `emphasis` names the one series you are arguing for, and
+the generator foregrounds it and mutes the rest; you say which series matters, it decides what that
+looks like. `aggregation` collapses repeated x values, which is what you want for a curve measured
+over several seeds.
+
+Supply `data.columns` and every field reference gets checked before you run anything.
+
+## What it checks
+
+Twelve rules run on the spec alone, no rendering needed. An error means the script will fail or the
+figure will misrepresent the data. A warning means it will run and a reviewer will still object.
+
+A log axis whose lower limit reaches zero. Inverted limits. A bar chart baselined at zero on a log
+value axis, which cannot work. A field missing from `data.columns`. `emphasis` naming a series
+absent from `series_order`, or used with no group at all. An unaggregated bar chart. Raster output
+below 300 dpi. More than eight series. A linear trendline fitted across a log axis.
+
+Errors do not block the script. You still get code, plus `ok: false` and the reason.
+
+Whether the data actually has repeated x values is not knowable from the spec, so that check ships
+inside the generated script and runs where the data is.
+
+## Scope
+
+Line, scatter, and bar. Box and heatmap are deliberately absent. Each kind costs a renderer plus
+verification rules plus render coverage, and it is worth knowing what a rule costs before
+committing to six of them.
 
 ## Connecting a client
-
-Claude Code:
 
 ```bash
 claude mcp add --transport http graph-unslopify https://json-translator-three.vercel.app/api/mcp
@@ -63,48 +85,52 @@ Cursor or Windsurf, in `mcp.json`:
 ```bash
 curl -X POST https://json-translator-three.vercel.app/api/convert \
   -H 'content-type: application/json' \
-  -d '{"kind":"line","x":[1,2,3],"y":[4,5,6]}'
+  -d '{"kind":"line","x":{"field":"epoch","label":"Epoch"},"y":{"field":"acc","label":"Accuracy"}}'
 ```
+
+You get 200 when the spec is clean, 422 when it parsed but has errors, and 400 when it did not
+parse.
 
 ## Running it locally
 
 ```bash
 npm install
-npm test          # 7 unit tests over src/core.ts
+npm test          # 24 unit tests, and python compiles every sample script
 npm run typecheck
 ```
 
-Unit tests do not prove the MCP wiring works, so there is a second layer. Start the offline server
-and drive a real handshake at it:
+Unit tests say nothing about whether the MCP wiring works, so start the offline server and drive a
+real handshake at it:
 
 ```bash
 PORT=3999 node scripts/serve.ts
 node scripts/smoke.ts http://localhost:3999
 ```
 
-`scripts/serve.ts` copies Vercel's file routing onto a plain Node server, which means you can
-exercise the handlers with no Vercel login. `scripts/smoke.ts` sends `initialize`, `tools/list`,
-and `tools/call` over the wire and checks all five responses. Point it at a deployed URL to check
-a release the same way.
+`scripts/serve.ts` copies Vercel's file routing onto a plain Node server, so no Vercel login is
+needed. `scripts/smoke.ts` sends `initialize`, `tools/list`, and `tools/call` over the wire and
+runs ten checks. Point it at a deployed URL to check a release the same way.
 
-`npm run dev` runs `vercel dev` instead. That matches deployed routing exactly, at the cost of
-needing a Vercel login.
+Compiling the generated Python only proves it parses. A wrong keyword argument survives that and
+dies at runtime, and a swapped axis label survives even running. So there is a third layer:
 
-## Deploying
+```bash
+node scripts/render-check.ts /path/to/python-with-matplotlib
+```
 
-Import the repo at [vercel.com/new](https://vercel.com/new). Framework preset is Other, and leave
-the build command empty. Everything runs on the Hobby tier, so it costs nothing. Vercel redeploys
-on every push to `main` once the project is linked.
-
-After a deploy, run `node scripts/smoke.ts https://json-translator-three.vercel.app`. If it prints five
-passes, a real MCP client can connect.
+That writes a synthetic CSV, generates sixteen scripts covering every branch of the emitter, runs
+each one, and checks a PNG landed. Both bugs fixed in `14aa6e1` were found this way, one of them
+only by opening the image.
 
 ## Layout
 
-`src/core.ts` holds all the logic in one function, `ingest`. The three files under `api/` call it
-and contain no logic of their own, 65 lines between them. Replacing the body of
-`ingest` is the whole job when the generator arrives, and its signature will not change, so the MCP
-tool and the HTTP endpoint both pick up the new behaviour with no edits.
+`src/schema.ts` is the contract, a discriminated union on `kind`. `src/verify.ts` holds the rules.
+`src/codegen.ts` owns every presentation number, including the palette, which is Okabe-Ito with the
+yellow removed because it is unreadable on white. `src/translate.ts` is the only entry point and
+does parse, check, emit. The three files under `api/` call it and hold no logic of their own.
+
+Adding a chart kind means one variant in the schema, one emitter function, its rules in
+`src/verify.ts`, and a case in `scripts/render-check.ts`.
 
 ## A note on mcp-handler
 

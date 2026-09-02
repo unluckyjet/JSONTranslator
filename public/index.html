@@ -9,30 +9,53 @@
       body {
         margin: 0 auto;
         padding: 3rem 1.25rem;
-        max-width: 44rem;
+        max-width: 46rem;
         font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
       }
-      code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+      code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88em; }
       pre { padding: 0.9rem; border-radius: 6px; overflow-x: auto; background: rgba(127,127,127,0.12); }
       table { border-collapse: collapse; width: 100%; }
       th, td { text-align: left; padding: 0.4rem 0.7rem 0.4rem 0; border-bottom: 1px solid rgba(127,127,127,0.3); }
-      .note { padding: 0.8rem 1rem; border-left: 3px solid #d08700; background: rgba(208,135,0,0.1); }
+      .lede { font-size: 1.05em; }
     </style>
   </head>
   <body>
     <h1>GraphUnslopify</h1>
-    <p>An MCP server and HTTP API that will translate JSON plot specifications into matplotlib code.</p>
+    <p class="lede">
+      An MCP server that turns a semantic figure specification into runnable matplotlib code.
+    </p>
 
-    <p class="note">
-      <strong>MVP.</strong> The transport and tool registration work. The translation does not exist
-      yet. Sending JSON returns <code>json successfully passed</code> and a description of what arrived.
+    <p>
+      An agent says what the figure means. The generator decides how it is drawn. There is no
+      colour, line width, or font size anywhere in the spec, which is the point. If an agent could
+      set them, every figure in your paper would disagree with every other one.
+    </p>
+
+    <p>Your data never leaves your machine. You get back a Python script that reads your own CSV.</p>
+
+    <h2>The spec</h2>
+    <pre><code>{
+  "kind": "line",
+  "x": { "field": "epoch", "label": "Training epoch" },
+  "y": { "field": "accuracy", "label": "Test accuracy", "unit": "%" },
+  "group": "model",
+  "aggregation": "mean",
+  "series_order": ["baseline", "ours"],
+  "emphasis": { "series": "ours" }
+}</code></pre>
+
+    <p>
+      <code>series_order</code> pins colour assignment so a model keeps its colour across every
+      figure. <code>emphasis</code> names the series you are arguing for and the generator
+      foregrounds it, muting the rest. <code>aggregation</code> collapses repeated x values, which
+      is what a curve measured over several seeds needs.
     </p>
 
     <h2>Endpoints</h2>
     <table>
       <tr><th>Path</th><th>Method</th><th>Purpose</th></tr>
       <tr><td><code>/api/mcp</code></td><td>GET, POST, DELETE</td><td>MCP Streamable HTTP</td></tr>
-      <tr><td><code>/api/convert</code></td><td>POST</td><td>Same behaviour without MCP, for curl</td></tr>
+      <tr><td><code>/api/convert</code></td><td>POST</td><td>Same translation without MCP, for curl</td></tr>
       <tr><td><code><a href="/api/health">/api/health</a></code></td><td>GET</td><td>Liveness</td></tr>
     </table>
 
@@ -40,11 +63,16 @@
     <pre><code>claude mcp add --transport http graph-unslopify \
   https://json-translator-three.vercel.app/api/mcp</code></pre>
 
-    <h2>Or just curl it</h2>
+    <h2>Or curl it</h2>
     <pre><code>curl -X POST https://json-translator-three.vercel.app/api/convert \
   -H 'content-type: application/json' \
-  -d '{"kind":"line","x":[1,2,3],"y":[4,5,6]}'</code></pre>
+  -d '{"kind":"line",
+       "x":{"field":"epoch","label":"Epoch"},
+       "y":{"field":"acc","label":"Accuracy"}}'</code></pre>
 
-    <p><a href="https://github.com/unluckyjet/JSONTranslator">Source on GitHub</a></p>
+    <p>
+      Line, scatter, and bar for now. Twelve checks run on the spec before anything is drawn.
+      <a href="https://github.com/unluckyjet/JSONTranslator">Source on GitHub</a>.
+    </p>
   </body>
 </html>
