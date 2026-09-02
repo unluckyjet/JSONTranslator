@@ -1,0 +1,26 @@
+{
+  "name": "graph-unslopify",
+  "version": "0.1.0",
+  "description": "MCP + HTTP service that will translate JSON plot specs into matplotlib code.",
+  "scripts": {
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "dev": "vercel dev",
+    "deploy": "vercel deploy --prod",
+    "smoke": "node scripts/smoke.ts"
+  },
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "mcp-handler": "^2.1.1",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "typescript": "^7.0.2"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  }
+}
