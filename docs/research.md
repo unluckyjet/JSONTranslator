@@ -1,6 +1,7 @@
 # What people complain about, and which check answers it
 
-Every rule in this repo traces to a documented complaint rather than to taste.
+Every rule in this repo traces to a documented complaint rather than to taste. There are 41 of them
+on the spec and 11 on the rendered figure.
 This is the mapping, so a future change to a threshold has to argue with a source.
 
 One honest note on method. X and similar platforms produced almost nothing usable, a single
@@ -39,8 +40,11 @@ White against black scores exactly 100, which is the known reference value for t
 Two things fell out of running this on our own output. Red against green scores 6.7 under
 deuteranopia, comfortably below the threshold of 11. And Okabe-Ito, which is colourblind-safe, is
 not greyscale-safe: adjacent entries sit within 0.06 relative luminance, so three of them merge in
-a black and white print. That is why `SECOND_CHANNEL_THRESHOLD` is 2 and the emitter assigns line
-styles or markers past two series.
+a black and white print. Reordering does not rescue it either. Searching all 40,320 orderings, the
+best still leaves four series 0.094 apart, under the 0.10 a reader needs. Luminance runs out and a
+second channel does not, so `SECOND_CHANNEL_THRESHOLD` is 1 and any multi-series figure gets line
+styles, markers or hatching. The first entry of each cycle is the plain form, so a single-series
+figure is untouched.
 
 This check also catches, automatically, the bug fixed in `382c85b` where emphasis painted three
 series the same grey. That one was found by hand, by opening a PNG.
@@ -87,9 +91,14 @@ The largest single error class in generated charts is sub-chart-type confusion a
 stacked against grouped bars, then improper bar spacing at 18% and misaligned gridline counts at
 15%.
 
-Nothing to check here yet, because the discriminated union in `src/schema.ts` makes the confusion
-unrepresentable. Stacked bars do not exist. When they land they should be a boolean on `BarSpec`
-rather than a separate `kind`, so a model choosing "bar" cannot accidentally choose the other one.
+The discriminated union in `src/schema.ts` makes the confusion unrepresentable. Stacking is a
+boolean on `BarSpec`, not a separate `kind`, so a model choosing "bar" cannot accidentally choose
+the other one, and switching between them is one field rather than a rewrite.
+
+Two rules guard the choice. `stacked_without_group` catches stacking with nothing to stack, and
+`too_many_stack_segments` fires past six, because only the bottom segment shares a baseline and the
+rest cannot be compared by eye. `stacking_signed_values` refuses to stack the output of
+`delta_vs_baseline`, which is negative by construction.
 
 ## Why not ask a model
 
