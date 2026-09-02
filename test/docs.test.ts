@@ -1,0 +1,52 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { RECIPES } from "../src/recipes.ts";
+import { FIGURE_KINDS } from "../src/schema.ts";
+
+/**
+ * The readmes quote counts, and a count in prose drifts silently. The gallery
+ * readme claimed eight specs when there were fourteen, and two CSVs when there
+ * were three, for long enough that both numbers read as deliberate.
+ */
+
+const root = join(import.meta.dirname, "..");
+
+const WORDS: Record<number, string> = {
+  3: "three",
+  7: "Seven",
+  11: "eleven",
+  14: "Fourteen",
+  47: "Forty-seven",
+};
+
+function read(path: string): string {
+  return readFileSync(join(root, path), "utf8");
+}
+
+test("the readme states the number of figure kinds", () => {
+  assert.match(read("README.md"), new RegExp(`${WORDS[FIGURE_KINDS.length]} kinds`));
+});
+
+test("the readme states the number of recipes", () => {
+  assert.match(read("README.md"), new RegExp(`${WORDS[RECIPES.length]} known-good specs`));
+});
+
+test("the readme states the number of lint rules", () => {
+  const source = read("src/verify.ts");
+  const codes = new Set<string>();
+  const call = /\badd\(\s*"(?:error|warning)"\s*,\s*"([a-z0-9_]+)"/g;
+  for (let m = call.exec(source); m; m = call.exec(source)) codes.add(m[1] ?? "");
+  assert.ok(codes.size > 0, "no rule codes found in src/verify.ts");
+  assert.match(read("README.md"), new RegExp(`${WORDS[codes.size]} rules run on the server`));
+});
+
+test("the gallery readme states how many specs and data files it has", () => {
+  const specs = readdirSync(join(root, "examples/specs")).filter((f) => f.endsWith(".json"));
+  const data = readdirSync(join(root, "examples/data")).filter((f) => f.endsWith(".csv"));
+  const gallery = read("examples/README.md");
+  assert.match(gallery, new RegExp(`${WORDS[specs.length]} figures`));
+  assert.match(gallery, new RegExp(`the ${WORDS[specs.length].toLowerCase()} inputs`));
+  assert.match(gallery, new RegExp(`the ${WORDS[data.length]} CSVs`));
+});

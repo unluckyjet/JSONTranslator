@@ -1,26 +1,26 @@
 # Baseline gallery
 
-Fourteen figures covering every branch of the emitter. Each one is built by POSTing a spec to the
-deployed API, running the Python that comes back, and committing both. The code and the images are
-version controlled, so changing the emitter shows up as a reviewable diff instead of a surprise in
-someone's paper.
+Fourteen figures covering every branch of the emitter. Each one is built by translating a spec with
+the emitter in this working tree, running the Python that comes out, and committing both. The code
+and the images are version controlled, so changing the emitter shows up as a reviewable diff instead
+of a surprise in someone's paper.
 
 ## Rebuild it
 
 ```bash
-npm run baseline                                   # against production
-PYTHON=/path/to/python npm run baseline            # pick the interpreter
-node scripts/baseline.ts http://localhost:3999     # against a local server
+npm run baseline                            # write the scripts and render them
+npm run baseline -- --check                 # report emitter drift, no Python needed
+PYTHON=/path/to/python npm run baseline     # pick the interpreter
 ```
 
-You need matplotlib and pandas for the second half. `pip install -r requirements.txt` into a venv
-covers it. The server itself has no Python dependency.
+You need matplotlib and pandas to render. `pip install -r requirements.txt` into a venv covers it.
+`--check` needs neither, which is why CI runs that one on every push.
 
 ## What is here
 
-`specs/` holds the eight inputs, one JSON file each. `data/` holds the two CSVs they read, written
-by `scripts/make-example-data.ts` from a fixed seed so the images do not move for unrelated
-reasons. `generated/` holds the Python the API returned. `baseline/` holds the rendered PNGs.
+`specs/` holds the fourteen inputs, one JSON file each. `data/` holds the three CSVs they read,
+written by `scripts/make-example-data.ts` from a fixed seed so the images do not move for unrelated
+reasons. `generated/` holds the emitted Python. `baseline/` holds the rendered images.
 
 | Spec | Exercises |
 | --- | --- |
@@ -52,7 +52,7 @@ gallery catches what it cannot.
 ## Regenerating the data
 
 ```bash
-node scripts/make-example-data.ts
+npm run example-data
 ```
 
 Only do this if you mean to. The CSVs are the fixed input behind every committed image, so

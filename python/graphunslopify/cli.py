@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import base64
 import json
-import runpy
 import subprocess
 import sys
 from pathlib import Path
@@ -37,6 +36,7 @@ def _run(args: argparse.Namespace) -> int:
         cwd=workdir,
         capture_output=True,
         text=True,
+        check=False,
     )
     output = completed.stdout.strip()
     if output:

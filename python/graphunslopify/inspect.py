@@ -12,8 +12,9 @@ opinion, so the same figure always produces the same findings.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Literal
+from typing import Any, Literal
 
 from .colour import composite_over_white, relative_luminance, worst_case_distance
 
@@ -273,22 +274,25 @@ def _series_appearance(axes: Any) -> list[tuple[str, tuple[float, float, float],
 
     handles, labels = axes.get_legend_handles_labels()
     series = []
-    for handle, label in zip(handles, labels):
+    for handle, label in zip(handles, labels, strict=True):
         # Bars hand back a BarContainer, which carries no colour of its own.
-        if hasattr(handle, "patches") and getattr(handle, "patches", None):
-            handle = handle.patches[0]
+        mark = handle.patches[0] if getattr(handle, "patches", None) else handle
 
         colour = None
         for getter in ("get_color", "get_facecolor", "get_edgecolor"):
-            if not hasattr(handle, getter):
+            if not hasattr(mark, getter):
                 continue
-            value = getattr(handle, getter)()
+            value = getattr(mark, getter)()
             if value is None:
                 continue
-            # A hex string is a sequence too, so it has to short-circuit here.
-            if not isinstance(value, str):
-                if hasattr(value, "__len__") and len(value) and hasattr(value[0], "__len__"):
-                    value = value[0]
+            # A hex string is a sequence too, so isinstance has to come first.
+            if (
+                not isinstance(value, str)
+                and hasattr(value, "__len__")
+                and len(value)
+                and hasattr(value[0], "__len__")
+            ):
+                value = value[0]
             try:
                 colour = to_rgb(value)
             except (ValueError, TypeError):
@@ -297,17 +301,17 @@ def _series_appearance(axes: Any) -> list[tuple[str, tuple[float, float, float],
         if colour is None:
             continue
 
-        alpha = handle.get_alpha() if hasattr(handle, "get_alpha") else None
+        alpha = mark.get_alpha() if hasattr(mark, "get_alpha") else None
         seen = composite_over_white(colour, 1.0 if alpha is None else alpha)
 
         channel = ""
         for getter in ("get_linestyle", "get_marker", "get_hatch"):
-            if hasattr(handle, getter):
-                channel += str(getattr(handle, getter)())
+            if hasattr(mark, getter):
+                channel += str(getattr(mark, getter)())
         # A scatter hands back a PathCollection, which has no get_marker. The
         # marker shape lives in the path itself, so hash that instead.
-        if hasattr(handle, "get_paths"):
-            paths = handle.get_paths()
+        if hasattr(mark, "get_paths"):
+            paths = mark.get_paths()
             if paths:
                 channel += hashlib.md5(paths[0].vertices.tobytes()).hexdigest()[:8]
         series.append((label, seen, channel))

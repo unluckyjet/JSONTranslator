@@ -9,21 +9,21 @@ script and it reports what a reviewer would complain about, before you submit.
     print(report)
 """
 
-from .colour import ciede2000, distance, simulate, worst_case_distance
 from .build import Figure, SpecError
+from .colour import ciede2000, distance, simulate, worst_case_distance
 from .describe import profile
-from .lockfile import appearance
 from .inspect import Finding, Report, inspect_figure
+from .lockfile import appearance
 
 __all__ = [
+    "Figure",
     "Finding",
     "Report",
+    "SpecError",
+    "appearance",
     "ciede2000",
     "distance",
     "inspect_figure",
-    "Figure",
-    "SpecError",
-    "appearance",
     "profile",
     "simulate",
     "worst_case_distance",

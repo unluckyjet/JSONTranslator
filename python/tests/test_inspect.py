@@ -104,7 +104,7 @@ def test_bar_series_are_examined_at_all():
     """
     from graphunslopify.inspect import _series_appearance
 
-    fig, ax = plt.subplots()
+    _fig, ax = plt.subplots()
     ax.bar([0, 1], [1, 2], color="#0072B2", label="Kids")
     ax.bar([0.4, 1.4], [2, 1], color="#D55E00", label="Adults")
     ax.legend()

@@ -303,6 +303,7 @@ class Figure:
             cwd=where,
             capture_output=True,
             text=True,
+            check=False,
         )
         if completed.stdout.strip():
             print(completed.stdout.strip())
