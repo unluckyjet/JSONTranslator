@@ -8,7 +8,9 @@
     "dev": "vercel dev",
     "deploy": "vercel deploy --prod",
     "smoke": "node scripts/smoke.ts",
-    "render-check": "node scripts/render-check.ts"
+    "render-check": "node scripts/render-check.ts",
+    "baseline": "node scripts/baseline.ts",
+    "example-data": "node scripts/make-example-data.ts"
   },
   "type": "module",
   "dependencies": {

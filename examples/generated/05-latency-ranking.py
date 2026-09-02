@@ -39,7 +39,8 @@ def load():
 
 def aggregate(df):
     keys = [X_FIELD]
-    return df.groupby(keys, as_index=False)[Y_FIELD].mean()
+    # sort=False keeps the file's category order instead of an alphabetical one.
+    return df.groupby(keys, as_index=False, sort=False)[Y_FIELD].mean()
 
 
 def draw(ax, df):
@@ -50,6 +51,8 @@ def draw(ax, df):
     ax.barh(positions, subset[Y_FIELD].to_numpy(), 0.7, color=PALETTE[0], zorder=2)
     ax.set_yticks(positions)
     ax.set_yticklabels([str(value) for value in categories])
+    # barh puts the first category at the bottom; readers expect it at the top.
+    ax.invert_yaxis()
 
 
 def finish(fig, ax):

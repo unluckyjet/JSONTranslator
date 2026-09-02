@@ -57,7 +57,8 @@ def series_style(name, index):
 
 def aggregate(df):
     keys = [X_FIELD, GROUP]
-    return df.groupby(keys, as_index=False)[Y_FIELD].mean()
+    # sort=False keeps the file's category order instead of an alphabetical one.
+    return df.groupby(keys, as_index=False, sort=False)[Y_FIELD].mean()
 
 
 def draw(ax, df):
@@ -95,6 +96,7 @@ def finish(fig, ax):
         title=None,
         frameon=False,
         loc="upper center", bbox_to_anchor=(0.5, -0.18),
+        ncol=min(len(ax.get_legend_handles_labels()[0]), 4),
     )
     # tight_layout is skipped: it fights a legend anchored outside the axes.
 

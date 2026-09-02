@@ -56,7 +56,8 @@ def series_style(name, index):
 
 def aggregate(df):
     keys = [X_FIELD, GROUP]
-    return df.groupby(keys, as_index=False)[Y_FIELD].mean()
+    # sort=False keeps the file's category order instead of an alphabetical one.
+    return df.groupby(keys, as_index=False, sort=False)[Y_FIELD].mean()
 
 
 def draw(ax, df):

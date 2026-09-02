@@ -119,8 +119,19 @@ node scripts/render-check.ts /path/to/python-with-matplotlib
 ```
 
 That writes a synthetic CSV, generates sixteen scripts covering every branch of the emitter, runs
-each one, and checks a PNG landed. Both bugs fixed in `14aa6e1` were found this way, one of them
-only by opening the image.
+each one, and checks a PNG landed.
+
+Even that is not the last word. A chart with swapped axis labels renders perfectly and writes a
+valid PNG, so the fourth layer is a committed gallery of images you look at:
+
+```bash
+npm install                              # once
+pip install -r requirements.txt          # into a venv
+npm run baseline                         # rebuild examples/baseline from the live API
+```
+
+Four of the emitter's bugs so far survived the unit tests, and three of those survived a successful
+render too. All of them were caught by opening the PNG. See `examples/README.md`.
 
 ## Layout
 
@@ -130,7 +141,11 @@ yellow removed because it is unreadable on white. `src/translate.ts` is the only
 does parse, check, emit. The three files under `api/` call it and hold no logic of their own.
 
 Adding a chart kind means one variant in the schema, one emitter function, its rules in
-`src/verify.ts`, and a case in `scripts/render-check.ts`.
+`src/verify.ts`, a case in `scripts/render-check.ts`, and a spec in `examples/specs`.
+
+Every commit is pushed automatically by `.githooks/post-commit`, wired up through
+`git config core.hooksPath .githooks`. A push failure prints a warning and exits 0, because a
+commit that already happened must not be undone by a network problem.
 
 ## A note on mcp-handler
 
