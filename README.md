@@ -56,6 +56,29 @@ Line, scatter, bar, box, violin and heatmap. Faceting into panels, Pareto fronti
 smoothing, sorting, filtering, derived values, direct labelling, and venue presets that set the
 column width and font floor from the real submission guides.
 
+## Third pass, the rest of the chart types
+
+| | |
+| --- | --- |
+| ![Heatmap of cafe customers by weekday and hour](docs/third-pass-heatmap.png) | ![Box plot of order wait times by store with a target line](docs/third-pass-box.png) |
+| ![Scatter of menu price against rating with a Pareto frontier](docs/third-pass-pareto.png) | ![Stacked bars of drink units sold by store](docs/third-pass-stacked.png) |
+
+*Made-up coffee chain data, one chart per kind*
+
+The data is invented, but each chart is the right choice for its question rather than a demo of the
+feature. The heatmap finds the weekday commuter spike at 8am and the weekend brunch block without
+being told either exists. The scatter draws the Pareto frontier. The box plot carries a target line
+that says what it means, `"meaning": "target"`, and lets the generator decide how a target is drawn.
+
+Building these found two bugs, and neither had shown up across thirty earlier figures. A scatter's
+legend handle is a `PathCollection`, which has no marker to read, so four genuinely distinct marker
+shapes all looked identical and the greyscale check complained about a problem the emitter had
+already solved. And a colourbar is an axes, so every heatmap looked like two panels disagreeing
+about their ranges.
+
+The third finding was mine, not the tool's. It told me the legend was sitting on three data points
+and suggested moving it outside, so I did.
+
 ## Writing a spec
 
 Do not guess at the data. Ask it:
