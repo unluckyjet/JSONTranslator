@@ -1,0 +1,37 @@
+{
+  "kind": "line",
+  "title": "Training loss",
+  "x": {
+    "field": "epoch",
+    "label": "Training epoch"
+  },
+  "y": {
+    "field": "loss",
+    "label": "Training loss",
+    "scale": "log"
+  },
+  "group": "model",
+  "aggregation": "median",
+  "series_order": [
+    "baseline",
+    "+augment",
+    "+distill",
+    "ours"
+  ],
+  "legend": {
+    "position": "upper_right"
+  },
+  "data": {
+    "path": "data/training.csv",
+    "columns": [
+      "model",
+      "seed",
+      "epoch",
+      "accuracy",
+      "loss"
+    ]
+  },
+  "output": {
+    "stem": "02-loss-log"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "kind": "bar",
+  "title": "Inference cost",
+  "x": {
+    "field": "model",
+    "label": "Model"
+  },
+  "y": {
+    "field": "latency_ms",
+    "label": "Latency",
+    "unit": "ms"
+  },
+  "aggregation": "mean",
+  "orientation": "horizontal",
+  "legend": {
+    "show": false
+  },
+  "data": {
+    "path": "data/benchmarks.csv",
+    "columns": [
+      "model",
+      "dataset",
+      "accuracy",
+      "latency_ms",
+      "params_m"
+    ]
+  },
+  "output": {
+    "stem": "05-latency-ranking"
+  }
+}

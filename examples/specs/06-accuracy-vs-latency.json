@@ -1,0 +1,40 @@
+{
+  "kind": "scatter",
+  "title": "Accuracy against cost",
+  "x": {
+    "field": "latency_ms",
+    "label": "Latency",
+    "unit": "ms"
+  },
+  "y": {
+    "field": "accuracy",
+    "label": "Top-1 accuracy",
+    "unit": "%"
+  },
+  "group": "model",
+  "series_order": [
+    "baseline",
+    "+augment",
+    "+distill",
+    "ours"
+  ],
+  "emphasis": {
+    "series": "ours"
+  },
+  "legend": {
+    "position": "lower_right"
+  },
+  "data": {
+    "path": "data/benchmarks.csv",
+    "columns": [
+      "model",
+      "dataset",
+      "accuracy",
+      "latency_ms",
+      "params_m"
+    ]
+  },
+  "output": {
+    "stem": "06-accuracy-vs-latency"
+  }
+}

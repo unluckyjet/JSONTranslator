@@ -1,0 +1,30 @@
+{
+  "kind": "line",
+  "x": {
+    "field": "epoch",
+    "label": "Training epoch"
+  },
+  "y": {
+    "field": "accuracy",
+    "label": "Test accuracy",
+    "unit": "%"
+  },
+  "aggregation": "mean",
+  "marker": true,
+  "legend": {
+    "show": false
+  },
+  "data": {
+    "path": "data/training.csv",
+    "columns": [
+      "model",
+      "seed",
+      "epoch",
+      "accuracy",
+      "loss"
+    ]
+  },
+  "output": {
+    "stem": "03-single-run"
+  }
+}

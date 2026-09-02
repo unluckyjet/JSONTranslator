@@ -1,0 +1,13 @@
+model,dataset,accuracy,latency_ms,params_m
+baseline,CIFAR-10,71.06,12.21,11.2
+baseline,CIFAR-100,56.12,12.25,11.2
+baseline,ImageNet,43.81,38.25,11.2
++augment,CIFAR-10,75.11,12.57,11.2
++augment,CIFAR-100,58.72,13.07,11.2
++augment,ImageNet,46.22,39.93,11.2
++distill,CIFAR-10,78.52,18.67,23.5
++distill,CIFAR-100,61.54,18.94,23.5
++distill,ImageNet,48.51,58.15,23.5
+ours,CIFAR-10,82.24,21.11,25.8
+ours,CIFAR-100,64.54,21.21,25.8
+ours,ImageNet,51.21,65.74,25.8

@@ -21,7 +21,8 @@ const PALETTE = [
   "#000000",
 ];
 
-const MUTED = "#bdbdbd";
+/** Recessive series keep their hue and lose salience, so they stay tellable apart. */
+const RECEDED_ALPHA = 0.4;
 
 const FIGURE_SIZES = {
   single_column: [3.4, 2.6],
@@ -134,7 +135,7 @@ function emitHeader(spec: FigureSpec, out: string[]): void {
 
   out.push(`FIGSIZE = (${width}, ${height})`);
   out.push(`PALETTE = ${pyList(PALETTE)}`);
-  out.push(`MUTED = ${pyStr(MUTED)}`, "");
+  out.push(`RECEDED_ALPHA = ${RECEDED_ALPHA}`, "");
 
   out.push(`DATA_PATH = ${pyStr(spec.data.path)}`);
   out.push(`X_FIELD = ${pyStr(spec.x.field)}`);
@@ -164,10 +165,10 @@ function emitSeriesHelpers(spec: FigureSpec, out: string[]): void {
     "def series_style(name, index):",
     "    colour = PALETTE[index % len(PALETTE)]",
     "    if EMPHASIS is None:",
-    `        return {"colour": colour, ${pyStr(key)}: ${sizes.base}, "zorder": 2}`,
+    `        return {"colour": colour, ${pyStr(key)}: ${sizes.base}, "alpha": 1.0, "zorder": 2}`,
     "    if name == EMPHASIS:",
-    `        return {"colour": colour, ${pyStr(key)}: ${sizes.emphasis}, "zorder": 3}`,
-    `    return {"colour": MUTED, ${pyStr(key)}: ${sizes.muted}, "zorder": 1}`,
+    `        return {"colour": colour, ${pyStr(key)}: ${sizes.emphasis}, "alpha": 1.0, "zorder": 3}`,
+    `    return {"colour": colour, ${pyStr(key)}: ${sizes.muted}, "alpha": RECEDED_ALPHA, "zorder": 1}`,
     "",
   );
 }
@@ -236,6 +237,7 @@ function emitLineDraw(spec: FigureSpec & { kind: "line" }, out: string[]): void 
       "            label=str(name),",
       '            color=style["colour"],',
       '            linewidth=style["width"],',
+      '            alpha=style["alpha"],',
       '            zorder=style["zorder"],',
     );
     if (spec.marker) out.push('            marker="o",');
@@ -273,6 +275,7 @@ function emitScatterDraw(spec: FigureSpec & { kind: "scatter" }, out: string[]):
       "            label=str(name),",
       '            color=style["colour"],',
       '            s=style["size"],',
+      '            alpha=style["alpha"],',
       '            zorder=style["zorder"],',
       "        )",
     );
@@ -311,6 +314,7 @@ function emitBarDraw(spec: FigureSpec & { kind: "bar" }, out: string[]): void {
       "            width,",
       "            label=str(name),",
       '            color=style["colour"],',
+      '            alpha=style["alpha"],',
       '            zorder=style["zorder"],',
       "        )",
     );

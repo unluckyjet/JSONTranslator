@@ -120,6 +120,18 @@ test("an aggregated line chart groups instead of warning", () => {
   assert.match(result.code, /groupby\(keys, as_index=False\)\[Y_FIELD\]\.mean\(\)/);
 });
 
+test("recessive series keep their own colour instead of collapsing to one grey", () => {
+  const result = translated({
+    ...line,
+    series_order: ["a", "b", "c", "d"],
+    emphasis: { series: "d" },
+  });
+  assert.match(result.code, /RECEDED_ALPHA = 0\.4/);
+  assert.match(result.code, /"colour": colour, "width": [\d.]+, "alpha": RECEDED_ALPHA/);
+  assert.ok(!result.code.includes("MUTED"));
+  assert.match(result.code, /alpha=style\["alpha"\]/);
+});
+
 test("output is deterministic", () => {
   assert.equal(translated(line).code, translated(line).code);
 });

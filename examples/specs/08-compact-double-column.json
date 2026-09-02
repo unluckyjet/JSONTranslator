@@ -1,0 +1,43 @@
+{
+  "kind": "line",
+  "title": "Accuracy over training, double column",
+  "x": {
+    "field": "epoch",
+    "label": "Training epoch"
+  },
+  "y": {
+    "field": "accuracy",
+    "label": "Test accuracy",
+    "unit": "%",
+    "limits": [
+      0,
+      90
+    ]
+  },
+  "group": "model",
+  "aggregation": "mean",
+  "series_order": [
+    "baseline",
+    "+augment",
+    "+distill",
+    "ours"
+  ],
+  "style": {
+    "preset": "paper_compact",
+    "grid": true
+  },
+  "output": {
+    "size": "double_column",
+    "stem": "08-compact-double-column"
+  },
+  "data": {
+    "path": "data/training.csv",
+    "columns": [
+      "model",
+      "seed",
+      "epoch",
+      "accuracy",
+      "loss"
+    ]
+  }
+}
