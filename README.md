@@ -27,31 +27,6 @@ vermillion land 0.07 apart in relative luminance, under the 0.10 a reader needs.
 palette does not save it. Of all 40,320 orderings the best still leaves four series 0.094 apart.
 Hatching does save it, at any number of series.
 
-![Training curves for four models with bootstrap confidence bands, a chance line and an annotation](docs/uncertainty-band.png)
-
-*What a spec buys you now*
-
-Mean over three seeds with a 95% bootstrap interval, the chance line labelled where it sits, and
-"best" attached to the maximum. The spec says `at: "max"`, never a pixel offset, and the script
-works out where that lands because only the script has the data.
-
-The spec behind it:
-
-```json
-{
-  "kind": "line",
-  "x": { "field": "epoch", "label": "Training epoch" },
-  "y": { "field": "accuracy", "label": "Test accuracy", "unit": "%" },
-  "group": "model",
-  "aggregation": "mean",
-  "uncertainty": { "kind": "ci", "level": 0.95, "over": "seed", "display": "band" },
-  "series_order": ["baseline", "+augment", "+distill", "ours"],
-  "emphasis": { "series": "ours" },
-  "reference_lines": [{ "axis": "y", "value": 25, "meaning": "chance", "label": "chance" }],
-  "annotate": [{ "at": "max", "series": "ours", "text": "best" }]
-}
-```
-
 Line, scatter, bar, box, violin and heatmap. Faceting into panels, Pareto frontiers, stacked bars,
 smoothing, sorting, filtering, derived values, direct labelling, and venue presets that set the
 column width and font floor from the real submission guides.
@@ -79,13 +54,51 @@ about their ranges.
 The third finding was mine, not the tool's. It told me the legend was sitting on three data points
 and suggested moving it outside, so I did.
 
-## Fourth pass, claims and alt text
+## Fourth pass, most of it switched on at once
 
-Two things came out of reading the integrity and accessibility literature.
+![Four training curves with confidence bands, two reference lines and two annotations](docs/fourth-pass-showcase.png)
 
-A figure can now carry the claim it is making, and the script tests it. The integrity work names
-this failure exactly: a caption asserting a gain while the axis is truncated cannot be caught by
-looking at pixels, because the checker cannot read the manuscript. So the claim goes in the spec.
+*Every feature that fits on one figure*
+
+Four methods, mean of five seeds with 95% bootstrap intervals, two reference lines that state what
+they mean rather than how they look, and two annotations placed at `"crossover"` and `"max"` instead
+of at coordinates. NeurIPS column width, and a dash pattern per series so it survives a black and
+white print. The spec names no colour and no position.
+
+```json
+{
+  "kind": "line",
+  "x": { "field": "epoch", "label": "Training epoch" },
+  "y": { "field": "accuracy", "label": "Top-1 accuracy", "unit": "%" },
+  "group": "method",
+  "aggregation": "mean",
+  "uncertainty": { "kind": "ci", "level": 0.95, "over": "seed", "display": "band" },
+  "series_order": ["ResNet-50", "+ MixUp", "+ Distill", "Ours"],
+  "emphasis": { "series": "Ours" },
+  "reference_lines": [
+    { "axis": "y", "value": 76.5, "meaning": "human", "label": "prior SOTA" },
+    { "axis": "x", "value": 8, "meaning": "threshold", "label": "warmup ends" }
+  ],
+  "annotate": [
+    { "at": "crossover", "series": "Ours", "text": "overtakes" },
+    { "at": "max", "series": "Ours", "text": "83.1%" }
+  ],
+  "style": { "venue": "neurips" }
+}
+```
+
+![The same four curves labelled at the end of each line instead of in a legend](docs/fourth-pass-direct-labels.png)
+
+*Direct labelling, which sidesteps the legend entirely*
+
+A legend box has to sit somewhere, and somewhere is usually on top of the data. Setting
+`legend.style` to `direct` puts each name at the end of its own line.
+
+### The part you cannot see
+
+A figure can now carry the claim it makes, and the script tests it against the data. The integrity
+work names this failure exactly, a caption asserting a gain the figure does not show, and notes that
+looking at pixels cannot catch it because the checker cannot read the manuscript.
 
 ```json
 "claims": [
@@ -106,7 +119,22 @@ claims:
 Alt text writes itself, which several journals now require. Levels one to three of the accessibility
 model are derivable, so the spec supplies the encoding and the script supplies the numbers and the
 trend. Level four is left to you rather than invented, because guessing at why a result matters is
-the fabrication this tool exists to avoid. Only claims that actually held get quoted.
+the fabrication this tool exists to avoid. Only claims that held get quoted.
+
+Each figure also writes a `.tex` block at the right column width, an optional interactive HTML
+version through plotly, and a hash of the data file so a stale figure can say so.
+
+### One appearance per series, across a whole paper
+
+| Figure 1 | Figure 7 |
+| --- | --- |
+| ![Two curves, baseline blue and ours orange](docs/lock-figure-1.png) | ![Three curves with baseline still blue and ours still orange](docs/lock-figure-2.png) |
+
+*The second figure lists the series in a different order and adds a third*
+
+`series_order` fixed colour inside one spec while figure 1 and figure 7 were free to disagree. Point
+`palette_lock` at a shared file and the first figure to mention a series claims an appearance for
+it. Adding a method later does not recolour the ones already in the paper.
 
 ## Writing a spec
 
@@ -133,12 +161,6 @@ fix instead of churning.
 
 `list_recipes` has eleven known-good specs to start from. `validate_spec` checks one without
 generating anything, and `score_spec` costs one so two can be compared.
-
-## One appearance per series, across a whole paper
-
-`series_order` fixed colour inside a single spec while figure 1 and figure 7 were free to disagree.
-Set `palette_lock` to a shared file and the first figure to mention a series claims an appearance
-for it. Adding a method later does not recolour the ones already in the paper.
 
 ## Connecting
 
