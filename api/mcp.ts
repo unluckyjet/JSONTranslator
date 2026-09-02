@@ -4,6 +4,8 @@ import { RECIPES, findRecipe, recipeNames } from "../src/recipes.ts";
 import { FIGURE_KINDS, FigureSpec } from "../src/schema.ts";
 import { translate } from "../src/translate.ts";
 import { verify } from "../src/verify.ts";
+import { repair, suggestFigures } from "../src/suggest.ts";
+import { designCost } from "../src/perception.ts";
 
 function issueList(issues: { path: string; message: string }[]): string {
   return issues.map((i) => `  ${i.path}: ${i.message}`).join("\n");
@@ -127,6 +129,117 @@ const handler = createMcpHandler(
             { type: "text", text: `${recipe.purpose}\n\n${JSON.stringify(recipe.spec, null, 2)}` },
           ],
           structuredContent: recipe,
+        };
+      },
+    );
+    server.registerTool(
+      "suggest_figures",
+      {
+        title: "Rank candidate figures for a dataset",
+        description:
+          "Given the JSON that `graphunslopify describe <file>` prints, return two or three " +
+          "candidate specs ranked by a weighted cost. The weights come from the Cleveland and " +
+          "McGill accuracy ranking, so a design that puts the quantity on a weak channel scores " +
+          "worse. Use this when you have a file and do not yet know what to plot.",
+        inputSchema: z.object({
+          profile: z
+            .object({
+              columns: z.array(
+                z.object({
+                  name: z.string(),
+                  role: z.enum(["measure", "category", "ordinal", "flag", "identifier"]),
+                  distinct: z.number(),
+                }).loose(),
+              ),
+              repeats: z
+                .array(z.object({ x: z.string(), group: z.string(), repeated_rows: z.number() }))
+                .optional(),
+            })
+            .loose()
+            .describe("The output of graphunslopify describe, passed through unchanged."),
+          limit: z.number().int().min(1).max(5).default(3),
+        }),
+      },
+      async ({ profile, limit }) => {
+        const candidates = suggestFigures(profile as never, limit);
+        if (!candidates.length) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "No candidate figure fits this profile. It may have no measured column.",
+              },
+            ],
+            isError: true,
+          };
+        }
+        const lines: string[] = [];
+        candidates.forEach((c, i) => {
+          lines.push(`${i + 1}. cost ${c.cost}, ${c.why}`);
+          if (c.reasons.length) lines.push(`   costs: ${c.reasons.join("; ")}`);
+          lines.push(JSON.stringify(c.spec, null, 2));
+          lines.push("");
+        });
+        const text = lines.join("\n");
+        return { content: [{ type: "text", text }], structuredContent: { candidates } };
+      },
+    );
+
+    server.registerTool(
+      "apply_fixes",
+      {
+        title: "Repair a spec using its own findings",
+        description:
+          "Take a spec, apply every fix the linter offers, and return the repaired spec plus " +
+          "whatever could not be fixed automatically. Stops after a budget of rounds rather than " +
+          "looping, and never invents a change the linter did not ask for.",
+        inputSchema: z.object({
+          spec: z.record(z.string(), z.unknown()),
+          budget: z.number().int().min(1).max(5).default(3),
+        }),
+      },
+      async ({ spec, budget }) => {
+        const result = repair(spec, budget);
+        const lines: string[] = [
+          result.applied.length
+            ? `Applied ${result.applied.length} fix(es): ${result.applied.join(", ")}.`
+            : "Nothing was automatically fixable.",
+        ];
+        if (result.remaining.length) {
+          lines.push("Still open:");
+          for (const item of result.remaining) lines.push(`  [${item.code}] ${item.message}`);
+        } else {
+          lines.push("Nothing left open.");
+        }
+        lines.push("", JSON.stringify(result.spec, null, 2));
+        return {
+          content: [{ type: "text", text: lines.join("\n") }],
+          structuredContent: result,
+        };
+      },
+    );
+
+    server.registerTool(
+      "score_spec",
+      {
+        title: "Cost a design so two can be compared",
+        description:
+          "Return a weighted cost for one spec and the reasons behind it. Lower is better. Use " +
+          "it to choose between two designs you are already considering, rather than to decide " +
+          "whether a single one is acceptable, which is what validate_spec is for.",
+        inputSchema: z.object({ spec: FigureSpec }),
+      },
+      async ({ spec }) => {
+        const { total, reasons } = designCost(spec);
+        const findings = verify(spec);
+        const lines = [`cost ${total}`];
+        if (reasons.length) lines.push(...reasons.map((r) => `  ${r}`));
+        else lines.push("  nothing charged");
+        lines.push(`${findings.length} lint finding(s)`);
+        const text = lines.join("\n");
+        return {
+          content: [{ type: "text", text }],
+          structuredContent: { cost: total, reasons, findings },
         };
       },
     );

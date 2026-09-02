@@ -82,7 +82,10 @@ export const CLAIM_WORDING: Record<(typeof CLAIM_KINDS)[number], string> = {
  * tested against that mean rather than against the raw draws.
  */
 export function emitClaimTests(claims: ClaimSpec[], out: string[]): void {
-  if (!claims.length) return;
+  // Always emitted. main() calls verify_claims unconditionally, and both
+  // functions short-circuit on an empty CLAIMS list, so a figure with no claims
+  // costs a function definition rather than a branch at every call site.
+  void claims;
 
   out.push(
     "",

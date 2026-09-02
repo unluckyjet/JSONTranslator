@@ -113,6 +113,8 @@ function emitPreamble(spec: FigureSpec, out: string[]): void {
   out.push(`SERIES_ORDER = ${spec.series_order ? pyList(spec.series_order) : "None"}`);
   out.push(`EMPHASIS = ${pyOptStr(spec.emphasis?.series)}`);
   out.push(`SERIES_COUNT = ${spec.series_order ? spec.series_order.length : 1}`);
+  out.push(`PALETTE_LOCK = ${pyOptStr(spec.palette_lock)}`);
+  out.push("LOCKED = None");
   if (hasCategoricalX(spec)) {
     const order = "category_order" in spec ? spec.category_order : undefined;
     out.push(`CATEGORY_ORDER = ${order ? pyList(order) : "None"}`);
@@ -271,6 +273,10 @@ function emitMain(spec: FigureSpec, out: string[]): void {
   );
   if (warnsDuplicates) out.push("    warn_duplicates(df)");
   out.push(
+    "    if PALETTE_LOCK is not None and GROUP is not None:",
+    "        globals()[\"LOCKED\"] = locked_appearance(",
+    "            SERIES_ORDER if SERIES_ORDER is not None else sorted(df[GROUP].dropna().unique(), key=str)",
+    "        )",
     "    blocks = panels(df)",
     "    columns = min(FACET_COLUMNS, len(blocks)) if len(blocks) > 1 else 1",
     "    rows = math.ceil(len(blocks) / columns)",

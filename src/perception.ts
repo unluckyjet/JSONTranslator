@@ -131,7 +131,8 @@ export function encodingSuggestions(spec: FigureSpec): Suggestion[] {
     });
   }
 
-  if (spec.kind === "bar" && spec.group && !spec.stacked) {
+  // Faceting already answers this, so the suggestion must not survive its own fix.
+  if (spec.kind === "bar" && spec.group && !spec.stacked && !spec.facet) {
     const series = spec.series_order?.length ?? 0;
     if (series > 4) {
       out.push({

@@ -192,7 +192,8 @@ test("the script carries its own provenance", () => {
   assert.match(result.code, /SPEC_HASH = "[0-9a-f]{16}"/);
   assert.match(result.code, /SPEC_JSON = /);
   assert.match(result.code, /DISCLOSURE = \(/);
-  assert.match(result.code, /"metadata": metadata_for\(fmt\)/);
+  assert.match(result.code, /metadata=meta/);
+  assert.match(result.code, /DATA_HASH = /);
 });
 
 test("the spec hash changes with the spec and not otherwise", () => {
