@@ -1,0 +1,180 @@
+/**
+ * Starting specs for the figures that keep recurring in papers.
+ *
+ * Assembling a spec field by field is where an agent gets things wrong, so
+ * these encode the combinations that are already known to be right. Every one
+ * passes `verify` with no findings once its field names are filled in.
+ */
+
+export type Recipe = {
+  name: string;
+  purpose: string;
+  spec: Record<string, unknown>;
+};
+
+export const RECIPES: Recipe[] = [
+  {
+    name: "training_curve",
+    purpose:
+      "Accuracy or loss over epochs for several models, averaged across seeds with a confidence band.",
+    spec: {
+      kind: "line",
+      x: { field: "epoch", label: "Training epoch" },
+      y: { field: "accuracy", label: "Test accuracy", unit: "%" },
+      group: "model",
+      aggregation: "mean",
+      uncertainty: { kind: "ci", level: 0.95, over: "seed", display: "band" },
+      series_order: ["baseline", "ours"],
+      emphasis: { series: "ours" },
+      legend: { position: "outside_right" },
+      data: { path: "results.csv" },
+    },
+  },
+  {
+    name: "ablation_bar",
+    purpose: "What each component contributes, as a sorted bar chart with error bars.",
+    spec: {
+      kind: "bar",
+      x: { field: "variant", label: "Configuration" },
+      y: { field: "accuracy", label: "Top-1 accuracy", unit: "%" },
+      aggregation: "mean",
+      uncertainty: { kind: "sem", display: "bar" },
+      sort: { by: "value", direction: "desc" },
+      value_labels: true,
+      data: { path: "ablation.csv" },
+    },
+  },
+  {
+    name: "benchmark_comparison",
+    purpose: "One score per model across several datasets, grouped and emphasised.",
+    spec: {
+      kind: "bar",
+      x: { field: "dataset", label: "Dataset" },
+      y: { field: "accuracy", label: "Top-1 accuracy", unit: "%" },
+      group: "model",
+      aggregation: "mean",
+      series_order: ["baseline", "ours"],
+      emphasis: { series: "ours" },
+      legend: { position: "outside_bottom" },
+      data: { path: "benchmarks.csv" },
+    },
+  },
+  {
+    name: "pareto",
+    purpose: "Accuracy against cost, with the non-dominated set drawn.",
+    spec: {
+      kind: "scatter",
+      x: { field: "latency_ms", label: "Latency", unit: "ms" },
+      y: { field: "accuracy", label: "Top-1 accuracy", unit: "%" },
+      group: "model",
+      frontier: { x: "min", y: "max" },
+      legend: { position: "lower_right" },
+      data: { path: "benchmarks.csv" },
+    },
+  },
+  {
+    name: "seed_distribution",
+    purpose: "How much run-to-run variance each model has, as a box per model.",
+    spec: {
+      kind: "box",
+      x: { field: "model", label: "Model" },
+      y: { field: "accuracy", label: "Final accuracy", unit: "%" },
+      show_points: true,
+      sort: { by: "value", direction: "desc" },
+      data: { path: "results.csv" },
+    },
+  },
+  {
+    name: "confusion_matrix",
+    purpose: "Predicted against true labels as a heatmap with the counts printed.",
+    spec: {
+      kind: "heatmap",
+      x: { field: "predicted", label: "Predicted label" },
+      y: { field: "actual", label: "True label" },
+      value: "count",
+      value_label: "Examples",
+      aggregation: "sum",
+      annotate_cells: true,
+      data: { path: "confusion.csv" },
+    },
+  },
+  {
+    name: "hyperparameter_grid",
+    purpose: "A sweep over two hyperparameters as a heatmap of the resulting score.",
+    spec: {
+      kind: "heatmap",
+      x: { field: "learning_rate", label: "Learning rate" },
+      y: { field: "batch_size", label: "Batch size" },
+      value: "accuracy",
+      value_label: "Validation accuracy (%)",
+      aggregation: "mean",
+      annotate_cells: true,
+      data: { path: "sweep.csv" },
+    },
+  },
+  {
+    name: "faceted_curves",
+    purpose: "One training curve panel per dataset, sharing axes so the panels compare.",
+    spec: {
+      kind: "line",
+      x: { field: "epoch", label: "Training epoch" },
+      y: { field: "accuracy", label: "Test accuracy", unit: "%" },
+      group: "model",
+      facet: { by: "dataset", columns: 3, share_y: true, panel_letters: true },
+      aggregation: "mean",
+      uncertainty: { kind: "sem", display: "band" },
+      output: { size: "double_column" },
+      data: { path: "results.csv" },
+    },
+  },
+  {
+    name: "delta_vs_baseline",
+    purpose: "How far each method moves the needle, as a signed change against the baseline.",
+    spec: {
+      kind: "bar",
+      x: { field: "dataset", label: "Dataset" },
+      y: { field: "accuracy", label: "Change in accuracy", unit: "pp" },
+      group: "model",
+      transform: { kind: "delta_vs_baseline", baseline: "baseline" },
+      aggregation: "mean",
+      baseline_zero: false,
+      reference_lines: [{ axis: "y", value: 0, meaning: "baseline", label: "no change" }],
+      data: { path: "results.csv" },
+    },
+  },
+  {
+    name: "scaling_law",
+    purpose: "Loss against parameters on log-log axes, which is where a power law looks straight.",
+    spec: {
+      kind: "scatter",
+      x: { field: "params_m", label: "Parameters", unit: "M", scale: "log" },
+      y: { field: "loss", label: "Test loss", scale: "log" },
+      group: "family",
+      data: { path: "scaling.csv" },
+    },
+  },
+  {
+    name: "animated_curve",
+    purpose: "A training curve that draws itself, for a talk or a project page.",
+    spec: {
+      kind: "line",
+      x: { field: "epoch", label: "Training epoch" },
+      y: { field: "accuracy", label: "Test accuracy", unit: "%" },
+      group: "model",
+      aggregation: "mean",
+      series_order: ["baseline", "ours"],
+      emphasis: { series: "ours" },
+      animate: { style: "draw", duration_s: 5, easing: "smooth", stagger_s: 0.4, format: "gif" },
+      output: { size: "double_column", formats: ["png"], stem: "animated" },
+      data: { path: "results.csv" },
+    },
+  },
+];
+
+export function recipeNames(): string[] {
+  return RECIPES.map((r) => r.name);
+}
+
+export function findRecipe(name: string): Recipe | undefined {
+  return RECIPES.find((r) => r.name === name);
+}

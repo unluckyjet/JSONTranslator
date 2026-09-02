@@ -10,6 +10,7 @@ script and it reports what a reviewer would complain about, before you submit.
 """
 
 from .colour import ciede2000, distance, simulate, worst_case_distance
+from .describe import profile
 from .inspect import Finding, Report, inspect_figure
 
 __all__ = [
@@ -18,8 +19,9 @@ __all__ = [
     "ciede2000",
     "distance",
     "inspect_figure",
+    "profile",
     "simulate",
     "worst_case_distance",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.4.0"

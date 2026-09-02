@@ -1,0 +1,222 @@
+import type { FigureSpec } from "../schema.ts";
+import { pyList, pyStr, pyValue } from "./py.ts";
+import { READERS } from "./theme.ts";
+
+/**
+ * The data pipeline the generated script runs before anything is drawn.
+ *
+ * Order matters and is fixed: read, filter, reshape, transform, then summarise.
+ * Filtering before transforming means a baseline comparison is computed over
+ * the rows that survive, which is what an author asking for both intends.
+ */
+
+const OPERATORS: Record<string, (field: string, value: string) => string> = {
+  eq: (f, v) => `df[${f}] == ${v}`,
+  ne: (f, v) => `df[${f}] != ${v}`,
+  lt: (f, v) => `df[${f}] < ${v}`,
+  lte: (f, v) => `df[${f}] <= ${v}`,
+  gt: (f, v) => `df[${f}] > ${v}`,
+  gte: (f, v) => `df[${f}] >= ${v}`,
+  in: (f, v) => `df[${f}].isin(${v})`,
+  not_in: (f, v) => `~df[${f}].isin(${v})`,
+};
+
+export function emitLoad(spec: FigureSpec, out: string[]): void {
+  out.push("", "def load():", `    return pd.${READERS[spec.data.format]}(DATA_PATH)`, "");
+}
+
+export function emitPrepare(spec: FigureSpec, out: string[]): void {
+  out.push("", "def prepare(df):");
+  const body: string[] = [];
+
+  for (const clause of spec.filter ?? []) {
+    const build = OPERATORS[clause.op]!;
+    body.push(`    df = df[${build(pyStr(clause.field), pyValue(clause.value))}]`);
+  }
+  if (spec.filter?.length) {
+    body.push("    if df.empty:", '        raise SystemExit("every row was filtered out")');
+  }
+
+  const melt = spec.series_from_columns;
+  if (melt) {
+    body.push(
+      "    # Wide columns become one series each.",
+      `    keep = [c for c in df.columns if c not in ${pyList(melt.fields)}]`,
+      "    df = df.melt(",
+      "        id_vars=keep,",
+      `        value_vars=${pyList(melt.fields)},`,
+      `        var_name=${pyStr(melt.series_name)},`,
+      `        value_name=${pyStr(melt.value_name)},`,
+      "    )",
+    );
+  }
+
+  const transform = spec.transform;
+  if (transform && transform.kind !== "none") {
+    body.push(...transformBody(spec, transform));
+  }
+
+  body.push("    return df");
+  out.push(...body, "");
+}
+
+function transformBody(
+  spec: FigureSpec,
+  transform: NonNullable<FigureSpec["transform"]>,
+): string[] {
+  const value = spec.kind === "heatmap" ? "VALUE_FIELD" : "Y_FIELD";
+
+  if (transform.kind === "cumulative") {
+    return [
+      "    # Running total along x within each series.",
+      "    order = [X_FIELD] if GROUP is None else [GROUP, X_FIELD]",
+      "    df = df.sort_values(order)",
+      `    key = GROUP if GROUP is not None else lambda _: 0`,
+      `    df[${value}] = df.groupby(key, sort=False)[${value}].cumsum()`,
+    ];
+  }
+
+  if (transform.kind === "normalize") {
+    return [
+      "    # Rescale each series to its own 0-1 range.",
+      "    def _unit(values):",
+      "        low, high = values.min(), values.max()",
+      "        return values * 0 if high == low else (values - low) / (high - low)",
+      "    if GROUP is None:",
+      `        df[${value}] = _unit(df[${value}])`,
+      "    else:",
+      `        df[${value}] = df.groupby(GROUP, sort=False)[${value}].transform(_unit)`,
+    ];
+  }
+
+  const percent = transform.kind === "percent_of_baseline";
+  return [
+    `    # Compare every series against ${pyStr(transform.baseline ?? "")}.`,
+    "    reference = (",
+    "        df[df[GROUP] == BASELINE_SERIES]",
+    `        .groupby(X_FIELD, sort=False)[${value}]`,
+    "        .mean()",
+    "    )",
+    "    if reference.empty:",
+    '        raise SystemExit(f"baseline series {BASELINE_SERIES!r} is not in the data")',
+    "    matched = df[X_FIELD].map(reference)",
+    percent
+      ? `    df[${value}] = 100.0 * df[${value}] / matched`
+      : `    df[${value}] = df[${value}] - matched`,
+    "    df = df[df[GROUP] != BASELINE_SERIES]",
+  ];
+}
+
+/**
+ * Collapsing repeats and measuring their spread.
+ *
+ * The confidence interval is a percentile bootstrap rather than a t interval,
+ * so the script needs numpy and nothing else, and it makes no assumption about
+ * the shape of the distribution over seeds.
+ */
+export function emitSummarise(spec: FigureSpec, out: string[]): void {
+  const aggregation = "aggregation" in spec ? spec.aggregation : "none";
+  const uncertainty = "uncertainty" in spec ? spec.uncertainty : undefined;
+
+  out.push("", "def summarise(frame):");
+  if (aggregation === "none") {
+    out.push("    return frame", "");
+    return;
+  }
+
+  out.push(
+    "    keys = [X_FIELD] + ([GROUP] if GROUP is not None else [])",
+    "    # sort=False keeps the file's category order instead of an alphabetical one.",
+    "    grouped = frame.groupby(keys, as_index=False, sort=False)[Y_FIELD]",
+    `    summary = grouped.${aggregation === "median" ? "median" : aggregation}()`,
+  );
+
+  if (!uncertainty) {
+    out.push("    return summary", "");
+    return;
+  }
+
+  out.push(
+    "    spread = frame.groupby(keys, sort=False)[Y_FIELD]",
+    "    centre = summary[Y_FIELD].to_numpy(dtype=float)",
+  );
+
+  switch (uncertainty.kind) {
+    case "std":
+      out.push(
+        "    width = spread.std(ddof=1).to_numpy(dtype=float)",
+        "    low, high = centre - width, centre + width",
+      );
+      break;
+    case "sem":
+      out.push(
+        "    width = spread.sem(ddof=1).to_numpy(dtype=float)",
+        "    low, high = centre - width, centre + width",
+      );
+      break;
+    case "range":
+      out.push(
+        "    low = spread.min().to_numpy(dtype=float)",
+        "    high = spread.max().to_numpy(dtype=float)",
+      );
+      break;
+    case "iqr":
+      out.push(
+        "    low = spread.quantile(0.25).to_numpy(dtype=float)",
+        "    high = spread.quantile(0.75).to_numpy(dtype=float)",
+      );
+      break;
+    case "ci":
+      out.push(
+        "    low, high = bootstrap_interval(frame, keys)",
+      );
+      break;
+  }
+
+  out.push(
+    '    summary["_low"] = np.where(np.isfinite(low), low, centre)',
+    '    summary["_high"] = np.where(np.isfinite(high), high, centre)',
+    "    return summary",
+    "",
+  );
+}
+
+export function emitBootstrap(spec: FigureSpec, out: string[]): void {
+  const uncertainty = "uncertainty" in spec ? spec.uncertainty : undefined;
+  if (uncertainty?.kind !== "ci") return;
+
+  const centre = "aggregation" in spec && spec.aggregation === "median" ? "median" : "mean";
+  out.push(
+    "",
+    "def bootstrap_interval(frame, keys):",
+    "    # Percentile bootstrap, so no distributional assumption and no scipy.",
+    "    rng = np.random.default_rng(BOOTSTRAP_SEED)",
+    "    lows, highs = [], []",
+    "    for _, block in frame.groupby(keys, sort=False):",
+    "        values = block[Y_FIELD].dropna().to_numpy(dtype=float)",
+    "        if len(values) < 2:",
+    "            lows.append(np.nan)",
+    "            highs.append(np.nan)",
+    "            continue",
+    "        draws = rng.choice(values, size=(BOOTSTRAP_DRAWS, len(values)), replace=True)",
+    `        stat = np.${centre}(draws, axis=1)`,
+    "        tail = (1.0 - CI_LEVEL) / 2.0",
+    "        lows.append(float(np.quantile(stat, tail)))",
+    "        highs.append(float(np.quantile(stat, 1.0 - tail)))",
+    "    return np.array(lows), np.array(highs)",
+    "",
+  );
+}
+
+export function emitSmooth(spec: FigureSpec, out: string[]): void {
+  if (spec.kind !== "line" || !spec.smooth) return;
+  const { kind, window } = spec.smooth;
+  out.push(
+    "",
+    "def smooth(values):",
+    kind === "ema"
+      ? `    return values.ewm(span=${window}, adjust=False).mean()`
+      : `    return values.rolling(${window}, min_periods=1, center=True).mean()`,
+    "",
+  );
+}

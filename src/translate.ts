@@ -1,4 +1,4 @@
-import { emitPython } from "./codegen.ts";
+import { emitPython } from "./codegen/index.ts";
 import { FigureSpec } from "./schema.ts";
 import { hasErrors, verify, type Finding } from "./verify.ts";
 

@@ -80,7 +80,7 @@ def _visible_texts(figure: Any) -> Iterable[Any]:
         yield artist
 
 
-def _check_text_size(figure: Any, report: Report, scale: float) -> None:
+def _check_text_size(figure: Any, report: Report, scale: float, floor: float) -> None:
     smallest = None
     for artist in _visible_texts(figure):
         effective = artist.get_fontsize() * scale
@@ -92,17 +92,17 @@ def _check_text_size(figure: Any, report: Report, scale: float) -> None:
 
     size, text = smallest
     label = text if len(text) <= 24 else text[:21] + "..."
-    if size < MIN_TEXT_POINTS:
+    if size < floor:
         report.add(
             "error",
             "text_too_small",
-            f'"{label}" renders at {size:.1f}pt. Below {MIN_TEXT_POINTS}pt is unreadable in print.',
+            f'"{label}" renders at {size:.1f}pt. Below {floor}pt is unreadable in print.',
         )
-    elif size < ADVISORY_TEXT_POINTS:
+    elif size < floor + 1.0:
         report.add(
             "warning",
             "text_near_minimum",
-            f'"{label}" renders at {size:.1f}pt, close to the {MIN_TEXT_POINTS}pt floor.',
+            f'"{label}" renders at {size:.1f}pt, close to the {floor}pt floor.',
         )
 
 
@@ -338,7 +338,46 @@ def _check_exaggeration(axes: Any, report: Report) -> None:
         )
 
 
-def inspect_figure(figure: Any, target_width_in: float | None = None) -> Report:
+def _check_panel_consistency(figure: Any, report: Report) -> None:
+    """Panels that share an axis must actually share its limits.
+
+    Faceting makes this easy to get wrong and impossible to spot by eye, because
+    each panel looks reasonable on its own while the comparison between them is
+    silently broken.
+    """
+    axes = [ax for ax in figure.get_axes() if ax.get_visible() and ax.has_data()]
+    if len(axes) < 2:
+        return
+
+    for name, getter in (("y", "get_ylim"), ("x", "get_xlim")):
+        spans = {tuple(round(v, 6) for v in getattr(ax, getter)()) for ax in axes}
+        if len(spans) > 1:
+            report.add(
+                "warning",
+                f"panels_disagree_on_{name}",
+                f"the panels use {len(spans)} different {name} ranges, so they cannot be "
+                "compared by eye. Set share_x or share_y, or say so in the caption.",
+            )
+
+    # A series must keep one colour across every panel or the legend lies.
+    seen: dict[str, set[tuple[float, float, float]]] = {}
+    for ax in axes:
+        for label, rgb, _ in _series_appearance(ax):
+            seen.setdefault(label, set()).add(tuple(round(c, 4) for c in rgb))
+    drifted = sorted(label for label, colours in seen.items() if len(colours) > 1)
+    if drifted:
+        report.add(
+            "error",
+            "series_colour_drifts_between_panels",
+            f"{', '.join(drifted)} changes colour from one panel to the next.",
+        )
+
+
+def inspect_figure(
+    figure: Any,
+    target_width_in: float | None = None,
+    min_text_pt: float = MIN_TEXT_POINTS,
+) -> Report:
     """Check a rendered figure and return everything wrong with it.
 
     `target_width_in` is the width the figure will occupy in the manuscript. Pass
@@ -355,7 +394,7 @@ def inspect_figure(figure: Any, target_width_in: float | None = None) -> Report:
     if target_width_in and figure_width > 0:
         scale = min(target_width_in / figure_width, 1.0)
 
-    _check_text_size(figure, report, scale)
+    _check_text_size(figure, report, scale, min_text_pt)
     for axes in figure.get_axes():
         _check_tick_collisions(axes, renderer, report)
         _check_legend_occlusion(axes, renderer, report)
@@ -364,4 +403,5 @@ def inspect_figure(figure: Any, target_width_in: float | None = None) -> Report:
         _check_truncated_bars(axes, report)
         _check_exaggeration(axes, report)
 
+    _check_panel_consistency(figure, report)
     return report

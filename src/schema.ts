@@ -5,8 +5,12 @@ import { z } from "zod";
  *
  * The rule this schema enforces is that a spec describes what the figure means,
  * never how matplotlib should draw it. There is no line width, no hex colour,
- * no font size, no margin. Those belong to the emitter, which owns every
- * presentation decision so that two figures in the same paper agree.
+ * no font size, no pixel offset. Those belong to the emitter, which owns every
+ * presentation decision so that two figures in one paper agree.
+ *
+ * Where a feature needs a position it takes a semantic one. An annotation
+ * attaches to "max" or "crossover", not to x=3.2, and the emitter works out
+ * where that lands and how to place the label clear of the data.
  */
 
 export const AxisSpec = z.object({
@@ -17,11 +21,18 @@ export const AxisSpec = z.object({
     .min(1)
     .optional()
     .describe('Unit appended to the label in parentheses, such as "%" or "ms".'),
-  scale: z.enum(["linear", "log"]).default("linear"),
+  scale: z
+    .enum(["linear", "log", "symlog"])
+    .default("linear")
+    .describe("symlog suits data that crosses zero and still spans orders of magnitude."),
   limits: z
     .tuple([z.number(), z.number()])
     .optional()
     .describe("Explicit [lower, upper] bounds. Set these only when the science requires them."),
+  percent: z
+    .boolean()
+    .default(false)
+    .describe("Format ticks as percentages. For proportions in 0-1, not values already in 0-100."),
 });
 export type AxisSpec = z.infer<typeof AxisSpec>;
 
@@ -39,7 +50,13 @@ export const LegendSpec = z.object({
     ])
     .default("best"),
   title: z.string().min(1).optional(),
+  style: z
+    .enum(["box", "direct"])
+    .default("box")
+    .describe('"direct" labels each series at the end of its line instead of drawing a box.'),
 });
+
+export const VENUES = ["none", "neurips", "icml", "iclr", "nature", "ieee"] as const;
 
 export const OutputSpec = z.object({
   size: z
@@ -55,6 +72,10 @@ export const StyleSpec = z.object({
   preset: z.enum(["paper", "paper_compact"]).default("paper"),
   grid: z.boolean().default(false),
   despine: z.boolean().default(true),
+  venue: z
+    .enum(VENUES)
+    .default("none")
+    .describe("Sets column width and the minimum font size from that venue's submission guide."),
 });
 
 export const DataSpec = z.object({
@@ -63,13 +84,125 @@ export const DataSpec = z.object({
   columns: z
     .array(z.string().min(1))
     .optional()
+    .describe("Columns the file is known to hold. Supply this and every field reference is checked."),
+});
+
+export const FilterSpec = z.object({
+  field: z.string().min(1),
+  op: z.enum(["eq", "ne", "lt", "lte", "gt", "gte", "in", "not_in"]),
+  value: z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number()]))]),
+});
+
+export const TransformSpec = z.object({
+  kind: z
+    .enum(["none", "delta_vs_baseline", "percent_of_baseline", "cumulative", "normalize"])
+    .default("none"),
+  baseline: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Which series is the baseline. Required by both baseline transforms."),
+});
+
+export const UncertaintySpec = z.object({
+  kind: z
+    .enum(["std", "sem", "ci", "iqr", "range"])
+    .describe("What the spread means. ci takes a level, the rest follow from the data."),
+  level: z.number().min(0.5).max(0.999).default(0.95).describe("Confidence level, for ci only."),
+  over: z
+    .string()
+    .min(1)
+    .optional()
+    .describe('Column the repeats vary along, such as "seed". Defaults to all repeated rows.'),
+  display: z
+    .enum(["band", "bar"])
+    .default("band")
+    .describe("A band suits a continuous x, error bars suit categories."),
+});
+
+export const SmoothSpec = z.object({
+  kind: z.enum(["ema", "rolling"]),
+  window: z.number().int().min(2).max(1000).default(10),
+  show_raw: z.boolean().default(true).describe("Keep the raw series faint behind the smoothed one."),
+});
+
+export const SortSpec = z.object({
+  by: z.enum(["value", "category", "series_order"]).default("category"),
+  direction: z.enum(["asc", "desc"]).default("asc"),
+});
+
+export const ReferenceLineSpec = z.object({
+  axis: z.enum(["x", "y"]),
+  value: z.number(),
+  label: z.string().min(1).optional(),
+  meaning: z
+    .enum(["chance", "human", "threshold", "baseline", "target", "other"])
+    .default("other")
+    .describe("What the line represents. The emitter decides how each kind is drawn."),
+});
+
+export const AnnotationSpec = z.object({
+  at: z
+    .union([
+      z.enum(["max", "min", "first", "last", "crossover"]),
+      z.object({ x: z.union([z.number(), z.string()]) }),
+    ])
+    .describe("Where to attach. The emitter finds the point and keeps the label clear of the data."),
+  series: z.string().min(1).optional().describe("Which series. Needed when the figure has a group."),
+  text: z.string().min(1),
+});
+
+export const FacetSpec = z.object({
+  by: z.string().min(1).describe("Column that splits the figure into panels."),
+  columns: z.number().int().min(1).max(6).default(2),
+  share_x: z.boolean().default(true),
+  share_y: z.boolean().default(true),
+  panel_letters: z.boolean().default(true).describe("Label panels (a), (b), (c) for the caption."),
+});
+
+export const SignificanceSpec = z.object({
+  method: z.enum(["bootstrap", "ttest", "mannwhitney"]),
+  pairs: z
+    .array(z.tuple([z.string(), z.string()]))
+    .min(1)
+    .describe("Category pairs to compare. The script runs the test rather than assuming a result."),
+  alpha: z.number().min(0.0001).max(0.2).default(0.05),
+});
+
+export const SecondaryAxisSpec = z.object({
+  field: z.string().min(1),
+  label: z.string().min(1),
+  unit: z.string().min(1).optional(),
+  scale: z.enum(["linear", "log"]).default("linear"),
+  justification: z
+    .string()
+    .min(20)
     .describe(
-      "Columns the file is known to contain. Supply this and every field reference gets checked.",
+      "Why two scales are needed here. Independently scaled axes can make any two series look " +
+        "related, so this is recorded in the figure metadata and the figure always warns.",
     ),
 });
 
-export const EmphasisSpec = z.object({
-  series: z.string().min(1).describe("The one series to foreground. Others are muted."),
+export const AnimateSpec = z.object({
+  style: z
+    .enum(["draw", "grow", "reveal", "trace", "fade"])
+    .default("draw")
+    .describe("draw traces lines left to right, grow raises bars, reveal brings series in one by one."),
+  duration_s: z.number().min(0.5).max(60).default(4),
+  fps: z.number().int().min(10).max(60).default(30),
+  easing: z
+    .enum(["linear", "smooth", "smoothstep", "rush_into", "rush_from"])
+    .default("smooth")
+    .describe("Named after the manim rate functions they reproduce."),
+  stagger_s: z.number().min(0).max(5).default(0.35).describe("Delay between series entering."),
+  hold_s: z.number().min(0).max(10).default(1.2).describe("Still time on the finished figure."),
+  format: z.enum(["mp4", "gif"]).default("mp4"),
+});
+
+export const SeriesFromColumnsSpec = z.object({
+  fields: z.array(z.string().min(1)).min(2).describe("Wide columns to turn into one series each."),
+  series_name: z.string().min(1).default("metric").describe("Name for the new grouping column."),
+  value_name: z.string().min(1).default("value").describe("Name for the new value column."),
 });
 
 const base = {
@@ -80,11 +213,21 @@ const base = {
     .min(1)
     .optional()
     .describe("Explicit series order. Fixes colour assignment across figures in one paper."),
-  emphasis: EmphasisSpec.optional(),
+  emphasis: z
+    .object({ series: z.string().min(1) })
+    .optional()
+    .describe("The one series being argued for. The emitter foregrounds it and recedes the rest."),
+  series_from_columns: SeriesFromColumnsSpec.optional(),
+  filter: z.array(FilterSpec).min(1).optional(),
+  transform: TransformSpec.optional(),
+  facet: FacetSpec.optional(),
+  reference_lines: z.array(ReferenceLineSpec).min(1).optional(),
+  annotate: z.array(AnnotationSpec).min(1).optional(),
   legend: LegendSpec.prefault({}),
   output: OutputSpec.prefault({}),
   style: StyleSpec.prefault({}),
   data: DataSpec.prefault({}),
+  animate: AnimateSpec.optional(),
 };
 
 const xy = { ...base, x: AxisSpec, y: AxisSpec };
@@ -97,15 +240,23 @@ export const LineSpec = z.object({
   aggregation: z
     .enum(["none", "mean", "median"])
     .default("none")
-    .describe(
-      "How to collapse repeated x values within a series. A curve over several seeds wants mean.",
-    ),
+    .describe("How to collapse repeated x values. A curve over several seeds wants mean."),
+  uncertainty: UncertaintySpec.optional(),
+  smooth: SmoothSpec.optional(),
+  y2: SecondaryAxisSpec.optional(),
 });
 
 export const ScatterSpec = z.object({
   ...xy,
   kind: z.literal("scatter"),
   trendline: z.enum(["none", "linear"]).default("none"),
+  frontier: z
+    .object({
+      x: z.enum(["min", "max"]).default("min").describe("Whether a good x is small or large."),
+      y: z.enum(["min", "max"]).default("max"),
+    })
+    .optional()
+    .describe("Draw the non-dominated set, for an accuracy against cost figure."),
 });
 
 export const BarSpec = z.object({
@@ -114,9 +265,65 @@ export const BarSpec = z.object({
   orientation: z.enum(["vertical", "horizontal"]).default("vertical"),
   aggregation: z.enum(["none", "mean", "median", "sum", "count"]).default("none"),
   baseline_zero: z.boolean().default(true),
+  stacked: z.boolean().default(false).describe("Parts of a whole. Leave false to compare categories."),
+  sort: SortSpec.optional(),
+  category_order: z.array(z.string().min(1)).min(1).optional(),
+  value_labels: z.boolean().default(false).describe("Print each value on its bar."),
+  uncertainty: UncertaintySpec.optional(),
+  significance: SignificanceSpec.optional(),
 });
 
-export const FigureSpec = z.discriminatedUnion("kind", [LineSpec, ScatterSpec, BarSpec]);
-export type FigureSpec = z.infer<typeof FigureSpec>;
+export const BoxSpec = z.object({
+  ...xy,
+  kind: z.literal("box"),
+  show_points: z.boolean().default(false).describe("Overlay the individual observations."),
+  notch: z.boolean().default(false).describe("Notches give a rough visual test of median difference."),
+  category_order: z.array(z.string().min(1)).min(1).optional(),
+  sort: SortSpec.optional(),
+});
 
+export const ViolinSpec = z.object({
+  ...xy,
+  kind: z.literal("violin"),
+  show_points: z.boolean().default(false),
+  show_box: z.boolean().default(true).describe("Draw a quartile box inside each violin."),
+  category_order: z.array(z.string().min(1)).min(1).optional(),
+});
+
+export const HeatmapSpec = z.object({
+  ...base,
+  kind: z.literal("heatmap"),
+  x: AxisSpec,
+  y: AxisSpec,
+  value: z.string().min(1).describe("Column holding the cell value."),
+  value_label: z.string().min(1).describe("Colourbar label. Without it the units are lost."),
+  aggregation: z.enum(["mean", "median", "sum", "count"]).default("mean"),
+  annotate_cells: z.boolean().default(false).describe("Print the number in each cell."),
+  diverging: z
+    .boolean()
+    .default(false)
+    .describe("Centre the colour scale on zero. For differences, not magnitudes."),
+});
+
+export const FigureSpec = z.discriminatedUnion("kind", [
+  LineSpec,
+  ScatterSpec,
+  BarSpec,
+  BoxSpec,
+  ViolinSpec,
+  HeatmapSpec,
+]);
+export type FigureSpec = z.infer<typeof FigureSpec>;
 export type FigureKind = FigureSpec["kind"];
+
+export const FIGURE_KINDS = ["line", "scatter", "bar", "box", "violin", "heatmap"] as const;
+
+/** Kinds whose x is a category on an index rather than a number. */
+export function hasCategoricalX(spec: FigureSpec): boolean {
+  return spec.kind === "bar" || spec.kind === "box" || spec.kind === "violin";
+}
+
+/** Kinds that draw one mark per series rather than a distribution. */
+export function usesSeriesColours(spec: FigureSpec): boolean {
+  return spec.kind !== "heatmap";
+}
