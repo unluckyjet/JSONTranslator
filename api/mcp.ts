@@ -1,33 +1,53 @@
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
-import { ingest } from "../src/core.ts";
+import { FigureSpec } from "../src/schema.ts";
+import { translate } from "../src/translate.ts";
 
 const handler = createMcpHandler(
   (server) => {
     server.registerTool(
-      "pass_json",
+      "figure_to_matplotlib",
       {
-        title: "Pass JSON",
+        title: "Figure spec to matplotlib",
         description:
-          "Send a JSON plot specification to GraphUnslopify. Returns an acknowledgement " +
-          "describing what was received. Matplotlib code generation is not implemented yet.",
-        inputSchema: z.object({
-          payload: z
-            .unknown()
-            .describe("Any JSON value. A JSON-encoded string is also accepted."),
-        }),
+          "Turn a semantic figure specification into a runnable matplotlib script, plus a list of " +
+          "problems found in the spec. Describe what the figure means, not how to draw it: there is " +
+          "no colour, line width, or font size to set, because the generator owns those so that " +
+          "every figure in one paper agrees. No data is sent; the script reads data.path locally.",
+        inputSchema: z.object({ spec: FigureSpec }),
       },
-      async ({ payload }) => {
-        const result = ingest(payload);
+      async ({ spec }) => {
+        const result = translate(spec);
+
+        if (result.status === "invalid_spec") {
+          const lines = result.issues.map((i) => `  ${i.path}: ${i.message}`).join("\n");
+          return {
+            content: [{ type: "text", text: `Spec rejected.\n${lines}` }],
+            isError: true,
+          };
+        }
+
+        const report = result.findings.length
+          ? result.findings.map((f) => `${f.severity.toUpperCase()} [${f.code}] ${f.message}`).join("\n")
+          : "No problems found.";
+
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [
+            { type: "text", text: `${report}\n\n# ${result.filename}\n${result.code}` },
+          ],
+          structuredContent: {
+            ok: result.ok,
+            filename: result.filename,
+            findings: result.findings,
+            code: result.code,
+          },
           isError: !result.ok,
         };
       },
     );
   },
   {
-    serverInfo: { name: "graph-unslopify", version: "0.1.0" },
+    serverInfo: { name: "graph-unslopify", version: "0.2.0" },
     verboseLogs: process.env.VERCEL_ENV !== "production",
   },
 );

@@ -1,22 +1,26 @@
-import { ingest } from "../src/core.ts";
+import { translate } from "../src/translate.ts";
 
 /**
- * Plain HTTP twin of the `pass_json` MCP tool, so the service can be exercised
- * with curl and by clients that do not speak MCP.
+ * Same translation over plain HTTP, for curl and for clients that do not speak
+ * MCP. Accepts a bare spec, or one wrapped as {"spec": ...}.
  */
 export async function POST(request: Request): Promise<Response> {
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return Response.json({ ok: false, message: "request body is not valid JSON" }, { status: 400 });
+    return Response.json(
+      { status: "invalid_spec", issues: [{ path: "(root)", message: "body is not valid JSON" }] },
+      { status: 400 },
+    );
   }
 
-  const payload =
-    body !== null && typeof body === "object" && "payload" in body
-      ? (body as { payload: unknown }).payload
+  const spec =
+    body !== null && typeof body === "object" && "spec" in body
+      ? (body as { spec: unknown }).spec
       : body;
 
-  const result = ingest(payload);
-  return Response.json(result, { status: result.ok ? 200 : 400 });
+  const result = translate(spec);
+  const status = result.status === "invalid_spec" ? 400 : result.ok ? 200 : 422;
+  return Response.json(result, { status });
 }
