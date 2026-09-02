@@ -134,6 +134,37 @@ def test_hatching_rescues_bars_that_merge_in_greyscale():
     assert "greyscale_collision" not in codes(fig2)
 
 
+def test_scatter_markers_count_as_a_second_channel():
+    """A PathCollection has no get_marker, so the shape has to come from the path."""
+    from graphunslopify.inspect import _series_appearance
+
+    fig, ax = plt.subplots()
+    ax.scatter([1, 2], [1, 2], marker="o", color="#0072B2", label="A")
+    ax.scatter([1, 2], [2, 3], marker="s", color="#D55E00", label="B")
+    ax.legend(loc="upper left")
+
+    channels = {channel for _, _, channel in _series_appearance(ax)}
+    assert len(channels) == 2
+    assert "greyscale_collision" not in codes(fig)
+
+
+def test_matching_scatter_markers_do_not_excuse_a_clash():
+    fig, ax = plt.subplots()
+    ax.scatter([1, 2], [1, 2], marker="o", color="#0072B2", label="A")
+    ax.scatter([1, 2], [2, 3], marker="o", color="#D55E00", label="B")
+    ax.legend(loc="upper left")
+    assert "greyscale_collision" in codes(fig)
+
+
+def test_a_colourbar_is_not_a_second_panel():
+    fig, ax = plt.subplots()
+    image = ax.imshow([[1, 2], [3, 4]])
+    fig.colorbar(image, ax=ax)
+    found = codes(fig)
+    assert "panels_disagree_on_x" not in found
+    assert "panels_disagree_on_y" not in found
+
+
 # --- readability ----------------------------------------------------------
 
 

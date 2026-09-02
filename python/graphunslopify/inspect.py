@@ -11,6 +11,7 @@ opinion, so the same figure always produces the same findings.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Literal
 
@@ -243,6 +244,12 @@ def _series_appearance(axes: Any) -> list[tuple[str, tuple[float, float, float],
         for getter in ("get_linestyle", "get_marker", "get_hatch"):
             if hasattr(handle, getter):
                 channel += str(getattr(handle, getter)())
+        # A scatter hands back a PathCollection, which has no get_marker. The
+        # marker shape lives in the path itself, so hash that instead.
+        if hasattr(handle, "get_paths"):
+            paths = handle.get_paths()
+            if paths:
+                channel += hashlib.md5(paths[0].vertices.tobytes()).hexdigest()[:8]
         series.append((label, seen, channel))
     return series
 
@@ -345,7 +352,13 @@ def _check_panel_consistency(figure: Any, report: Report) -> None:
     each panel looks reasonable on its own while the comparison between them is
     silently broken.
     """
-    axes = [ax for ax in figure.get_axes() if ax.get_visible() and ax.has_data()]
+    # A colourbar is an axes but not a panel, and counting it makes every
+    # heatmap look like two panels that disagree.
+    axes = [
+        ax
+        for ax in figure.get_axes()
+        if ax.get_visible() and ax.has_data() and ax.get_label() != "<colorbar>"
+    ]
     if len(axes) < 2:
         return
 
