@@ -4,3 +4,11 @@ node_modules/
 .env.*
 *.log
 .claude/logs/
+
+# python build artefacts
+*.egg-info/
+__pycache__/
+*.pyc
+.pytest_cache/
+build/
+dist/
