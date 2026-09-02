@@ -67,7 +67,14 @@ check("MCP initialize", init.result?.serverInfo?.name === "graph-unslopify", ini
 
 const tools = await rpc("tools/list", {}, 2);
 const names: string[] = (tools.result?.tools ?? []).map((t: { name: string }) => t.name);
-for (const wanted of ["figure_to_matplotlib", "validate_spec", "list_recipes"]) {
+for (const wanted of [
+  "figure_to_matplotlib",
+  "validate_spec",
+  "list_recipes",
+  "suggest_figures",
+  "apply_fixes",
+  "score_spec",
+]) {
   check(`tools/list exposes ${wanted}`, names.includes(wanted), names);
 }
 
@@ -127,6 +134,73 @@ const rejected = await rpc(
   9,
 );
 check("an unknown chart kind is rejected", rejected.result?.isError === true, rejected);
+
+const suggested = await rpc(
+  "tools/call",
+  {
+    name: "suggest_figures",
+    arguments: {
+      profile: {
+        columns: [
+          { name: "model", role: "category", distinct: 4 },
+          { name: "seed", role: "ordinal", distinct: 3 },
+          { name: "epoch", role: "ordinal", distinct: 30 },
+          { name: "accuracy", role: "measure", distinct: 200 },
+        ],
+        repeats: [{ x: "epoch", group: "model", repeated_rows: 240 }],
+      },
+    },
+  },
+  10,
+);
+const suggestedText: string = suggested.result?.content?.[0]?.text ?? "";
+check("suggest_figures ranks candidates", suggestedText.includes("cost 0"), suggestedText.slice(0, 200));
+check(
+  "the top suggestion aggregates over the repeats",
+  suggestedText.includes('"aggregation": "mean"'),
+  suggestedText.slice(0, 300),
+);
+
+const repaired = await rpc(
+  "tools/call",
+  {
+    name: "apply_fixes",
+    arguments: {
+      spec: {
+        kind: "bar",
+        x: { field: "dataset", label: "Dataset" },
+        y: { field: "acc", label: "Accuracy" },
+        group: "model",
+        stacked: true,
+        aggregation: "mean",
+        series_order: ["a", "b", "c", "d", "e", "f"],
+      },
+    },
+  },
+  11,
+);
+const repairedText: string = repaired.result?.content?.[0]?.text ?? "";
+check("apply_fixes unstacks the bar", repairedText.includes("stacked_costs_a_baseline"), repairedText.slice(0, 200));
+check("apply_fixes leaves nothing open", repairedText.includes("Nothing left open"), repairedText.slice(0, 300));
+
+const claimed = await rpc(
+  "tools/call",
+  {
+    name: "figure_to_matplotlib",
+    arguments: {
+      spec: {
+        ...SPEC,
+        claims: [{ kind: "beats_everywhere", subject: "ours", reference: "baseline" }],
+        output: { latex: true },
+      },
+    },
+  },
+  12,
+);
+const claimedText: string = claimed.result?.content?.[0]?.text ?? "";
+check("claims reach the script", claimedText.includes("def verify_claims"), claimedText.slice(0, 200));
+check("alt text is generated", claimedText.includes("ENCODING_SENTENCE"), claimedText.slice(0, 200));
+check("latex is written", claimedText.includes("def write_latex"), claimedText.slice(0, 200));
 
 const convert = await fetch(`${base}/api/convert`, {
   method: "POST",
