@@ -95,6 +95,45 @@ def test_a_second_channel_excuses_a_colour_vision_clash():
     assert "series_indistinguishable" not in codes(fig)
 
 
+def test_bar_series_are_examined_at_all():
+    """A bar legend hands back a BarContainer, not a patch.
+
+    The colour check silently skipped every bar chart until this was noticed,
+    because the container carries no colour of its own and the extractor found
+    nothing to measure.
+    """
+    from graphunslopify.inspect import _series_appearance
+
+    fig, ax = plt.subplots()
+    ax.bar([0, 1], [1, 2], color="#0072B2", label="Kids")
+    ax.bar([0.4, 1.4], [2, 1], color="#D55E00", label="Adults")
+    ax.legend()
+    assert len(_series_appearance(ax)) == 2
+
+
+def test_bars_in_the_same_colour_are_caught():
+    fig, ax = plt.subplots()
+    ax.bar([0, 1], [1, 2], color="#0072B2", label="Kids")
+    ax.bar([0.4, 1.4], [2, 1], color="#0072B2", label="Adults")
+    ax.legend()
+    assert "series_indistinguishable" in codes(fig)
+
+
+def test_hatching_rescues_bars_that_merge_in_greyscale():
+    """Okabe-Ito blue and vermillion sit 0.07 apart in luminance."""
+    fig, ax = plt.subplots()
+    ax.bar([0, 1], [1, 2], color="#0072B2", label="Kids")
+    ax.bar([0.4, 1.4], [2, 1], color="#D55E00", label="Adults")
+    ax.legend()
+    assert "greyscale_collision" in codes(fig)
+
+    fig2, ax2 = plt.subplots()
+    ax2.bar([0, 1], [1, 2], color="#0072B2", hatch="", edgecolor="white", label="Kids")
+    ax2.bar([0.4, 1.4], [2, 1], color="#D55E00", hatch="///", edgecolor="white", label="Adults")
+    ax2.legend()
+    assert "greyscale_collision" not in codes(fig2)
+
+
 # --- readability ----------------------------------------------------------
 
 

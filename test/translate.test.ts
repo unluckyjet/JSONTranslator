@@ -162,12 +162,20 @@ test("a second visual channel appears once colour stops being enough", () => {
   const few = translated({ ...line, series_order: ["a", "b"] });
   const many = translated({ ...line, series_order: ["a", "b", "c", "d", "e", "f"] });
 
-  assert.match(few.code, /SECOND_CHANNEL_THRESHOLD = 2/);
+  assert.match(few.code, /SECOND_CHANNEL_THRESHOLD = 1/);
   assert.match(few.code, /LINE_STYLES = \["-", "--", "-\.", ":"\]/);
   for (const code of [few.code, many.code]) {
     assert.match(code, /channel = LINE_STYLES\[index % len\(LINE_STYLES\)\] if total > SECOND_CHANNEL_THRESHOLD/);
     assert.match(code, /linestyle=style\["linestyle"\]/);
   }
+});
+
+test("bars reach for hatching rather than line styles", () => {
+  const result = translated({ ...line, kind: "bar", aggregation: "mean" });
+  assert.match(result.code, /HATCHES = /);
+  assert.match(result.code, /hatch=style\["hatch"\]/);
+  assert.match(result.code, /edgecolor="white"/);
+  assert.ok(!result.code.includes("LINE_STYLES"));
 });
 
 test("scatter reaches for markers rather than line styles", () => {

@@ -26,18 +26,20 @@ const PALETTE = [
 const RECEDED_ALPHA = 0.4;
 
 /**
- * Past this many series, colour alone stops being enough. A second channel
- * keeps the figure readable in greyscale and for a reader with a colour vision
- * deficiency, which is roughly one man in twelve.
+ * Any chart with more than this many series carries a second visual channel,
+ * so colour is never the only thing separating two series.
  *
- * Two, not four. Okabe-Ito is colourblind-safe but not greyscale-safe: its
- * adjacent colours sit within 0.06 relative luminance of each other, so three
- * of them merge in a black and white print. The render-time checker flags that,
- * and there is no spec knob to fix it, so the emitter has to.
+ * One, so it always applies. Okabe-Ito is colourblind-safe but not
+ * greyscale-safe, and reordering cannot fix that: searching every permutation,
+ * the best possible ordering still leaves four series only 0.094 apart in
+ * relative luminance, under the 0.10 a reader needs. Luminance runs out, a
+ * second channel does not. The first entry in each cycle is the plain form, so
+ * a single-series chart looks untouched.
  */
-const SECOND_CHANNEL_THRESHOLD = 2;
+const SECOND_CHANNEL_THRESHOLD = 1;
 const LINE_STYLES = ["-", "--", "-.", ":"];
 const MARKERS = ["o", "s", "^", "D", "v", "P", "X", "*"];
+const HATCHES = ["", "///", "...", "xxx", "\\\\\\", "+++", "ooo", "**"];
 
 export const TOOL_VERSION = "0.3.0";
 
@@ -162,7 +164,13 @@ function emitHeader(spec: FigureSpec, out: string[]): void {
   out.push(`PALETTE = ${pyList(PALETTE)}`);
   out.push(`RECEDED_ALPHA = ${RECEDED_ALPHA}`);
   out.push(`SECOND_CHANNEL_THRESHOLD = ${SECOND_CHANNEL_THRESHOLD}`);
-  out.push(spec.kind === "scatter" ? `MARKERS = ${pyList(MARKERS)}` : `LINE_STYLES = ${pyList(LINE_STYLES)}`);
+  out.push(
+    spec.kind === "scatter"
+      ? `MARKERS = ${pyList(MARKERS)}`
+      : spec.kind === "bar"
+        ? `HATCHES = ${pyList(HATCHES)}`
+        : `LINE_STYLES = ${pyList(LINE_STYLES)}`,
+  );
   out.push("");
 
   out.push(`DATA_PATH = ${pyStr(spec.data.path)}`);
@@ -192,10 +200,13 @@ function emitSeriesHelpers(spec: FigureSpec, out: string[]): void {
   const preset = PRESETS[spec.style.preset];
   const sizes = spec.kind === "scatter" ? preset.marker : preset.line;
   const key = spec.kind === "scatter" ? "size" : "width";
-  const scatter = spec.kind === "scatter";
-  const channelConst = scatter ? "MARKERS" : "LINE_STYLES";
-  const channelKey = scatter ? "marker" : "linestyle";
-  const defaultChannel = scatter ? pyStr("o") : pyStr("-");
+
+  const channelConst =
+    spec.kind === "scatter" ? "MARKERS" : spec.kind === "bar" ? "HATCHES" : "LINE_STYLES";
+  const channelKey =
+    spec.kind === "scatter" ? "marker" : spec.kind === "bar" ? "hatch" : "linestyle";
+  const defaultChannel =
+    spec.kind === "scatter" ? pyStr("o") : spec.kind === "bar" ? pyStr("") : pyStr("-");
 
   out.push(
     "",
@@ -370,6 +381,9 @@ function emitBarDraw(spec: FigureSpec & { kind: "bar" }, out: string[]): void {
       '            color=style["colour"],',
       '            alpha=style["alpha"],',
       '            zorder=style["zorder"],',
+      '            hatch=style["hatch"],',
+      '            edgecolor="white",',
+      "            linewidth=0.0,",
       "        )",
     );
   } else {

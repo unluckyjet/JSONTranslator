@@ -213,6 +213,10 @@ def _series_appearance(axes: Any) -> list[tuple[str, tuple[float, float, float],
     handles, labels = axes.get_legend_handles_labels()
     series = []
     for handle, label in zip(handles, labels):
+        # Bars hand back a BarContainer, which carries no colour of its own.
+        if hasattr(handle, "patches") and getattr(handle, "patches", None):
+            handle = handle.patches[0]
+
         colour = None
         for getter in ("get_color", "get_facecolor", "get_edgecolor"):
             if not hasattr(handle, getter):
@@ -236,10 +240,9 @@ def _series_appearance(axes: Any) -> list[tuple[str, tuple[float, float, float],
         seen = composite_over_white(colour, 1.0 if alpha is None else alpha)
 
         channel = ""
-        if hasattr(handle, "get_linestyle"):
-            channel += str(handle.get_linestyle())
-        if hasattr(handle, "get_marker"):
-            channel += str(handle.get_marker())
+        for getter in ("get_linestyle", "get_marker", "get_hatch"):
+            if hasattr(handle, getter):
+                channel += str(getattr(handle, getter)())
         series.append((label, seen, channel))
     return series
 
