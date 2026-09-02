@@ -66,6 +66,9 @@ def series_style(name, index, total):
     colour = PALETTE[index % len(PALETTE)]
     # Colour alone stops working past a handful of series, so add a second channel.
     channel = LINE_STYLES[index % len(LINE_STYLES)] if total > SECOND_CHANNEL_THRESHOLD else "-"
+    if name == EMPHASIS:
+        # The series being argued for reads as the plain form, not a dashed one.
+        channel = "-"
     if EMPHASIS is None:
         style = {"colour": colour, "width": 1.4, "alpha": 1.0, "zorder": 2}
     elif name == EMPHASIS:
