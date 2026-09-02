@@ -27,9 +27,9 @@ vermillion land 0.07 apart in relative luminance, under the 0.10 a reader needs.
 palette does not save it. Of all 40,320 orderings the best still leaves four series 0.094 apart.
 Hatching does save it, at any number of series.
 
-Line, scatter, bar, box, violin, heatmap and table. Faceting into panels, Pareto frontiers, stacked
-bars, smoothing, sorting, filtering, derived values, direct labelling, and venue presets that set
-the column width and font floor from the real submission guides.
+Seven kinds: line, scatter, bar, box, violin, heatmap and table. Panels, layers, insets and cut
+axes compose them. Venue presets set the column width and the font floor from the real submission
+guides, so a figure is measured against the width it will actually be printed at.
 
 ## Third pass, the rest of the chart types
 
@@ -37,13 +37,17 @@ the column width and font floor from the real submission guides.
 | --- | --- |
 | ![Heatmap of cafe customers by weekday and hour](docs/third-pass-heatmap.png) | ![Box plot of order wait times by store with a target line](docs/third-pass-box.png) |
 | ![Scatter of menu price against rating with a Pareto frontier](docs/third-pass-pareto.png) | ![Stacked bars of drink units sold by store](docs/third-pass-stacked.png) |
+| ![Violin plot of the same wait times, showing the full distribution](docs/third-pass-violin.png) | ![Animated training curve drawing itself](docs/animated-curve.gif) |
 
 *Made-up coffee chain data, one chart per kind*
 
-The data is invented, but each chart is the right choice for its question rather than a demo of the
-feature. The heatmap finds the weekday commuter spike at 8am and the weekend brunch block without
-being told either exists. The scatter draws the Pareto frontier. The box plot carries a target line
-that says what it means, `"meaning": "target"`, and lets the generator decide how a target is drawn.
+The data is invented, but each chart answers a real question rather than demonstrating a feature.
+
+The heatmap finds the weekday commuter spike at 8am and the weekend brunch block without being told
+either exists. The box plot carries a target line that says `"meaning": "target"` and lets the
+generator decide how a target looks. The violin beside it shows the whole distribution where the box
+shows five numbers. The last one is the same figure as a gif, because `animate` is a field rather
+than a separate tool.
 
 Building these found two bugs, and neither had shown up across thirty earlier figures. A scatter's
 legend handle is a `PathCollection`, which has no marker to read, so four genuinely distinct marker
@@ -93,6 +97,13 @@ white print. The spec names no colour and no position.
 
 A legend box has to sit somewhere, and somewhere is usually on top of the data. Setting
 `legend.style` to `direct` puts each name at the end of its own line.
+
+![Three panels, one per benchmark, sharing a y axis with one legend](docs/fourth-pass-facets.png)
+
+*Faceting, with one legend and axis labels only on the outer panels*
+
+`facet` splits the data into one panel per value. The panels share their axes so a reader can
+compare them, the legend appears once, and only the outer panels carry axis labels.
 
 ### The part you cannot see
 
@@ -144,9 +155,13 @@ it. Adding a method later does not recolour the ones already in the paper.
 
 *A cut axis and a zoomed inset*
 
-Extra marks over the same axes, one panel per metric, a gap cut out of an axis, and a magnified
-corner. Vega-Lite's operators compose recursively, which is more than this needs. What recurs in a
-paper is a short flat list, so that is what the spec takes.
+The slanted marks at the join are the point of a cut axis. Without them a reader takes the axis for
+continuous and misreads every distance across the gap, which is the failure the truncation
+literature is about. The inset marks its source region with a matching outline rather than connector
+lines, because connectors on a flat chart read as a perspective box.
+
+Vega-Lite's operators compose recursively, which is more than this needs. What recurs in a paper is
+a short flat list, so that is what the spec takes.
 
 ```json
 {
@@ -157,9 +172,19 @@ paper is a short flat list, so that is what the spec takes.
 }
 ```
 
-A cut axis is drawn as two stacked axes with slanted marks at the join. The marks are the point.
-Without them a reader takes the axis for continuous and misreads every distance across the gap,
-which is the failure the truncation literature is about.
+| | |
+| --- | --- |
+| ![Curves with individual observations and a rug of tick marks underneath](docs/fifth-pass-layers.png) | ![Three panels, one per metric, each with its own y label](docs/fifth-pass-repeat.png) |
+
+*Layers over the same axes, and one panel per metric*
+
+A layer adds a mark over the figure's own x, so observations can sit over a fitted line and a rug
+can show where the data actually falls. `repeat` gives one panel per named column, and each panel
+takes its own label rather than the spec's.
+
+![A three row results table with the winning value bold in each row](docs/fifth-pass-table.png)
+
+*The table kind, rendered as an image and written as markdown and LaTeX*
 
 There is a `table` kind now, because sometimes six numbers should not be a chart. A printed number
 is exact rather than estimated, so it outranks every graphical channel for reading one value. One
@@ -189,8 +214,8 @@ from graphunslopify import Figure
 `average_over` sets the aggregation and the spread together, because doing one without the other
 throws away what a reader most needs. `render` posts the spec, writes the script beside the data and
 runs it, so what lands on disk is the same script an agent would have got. Nothing here
-reimplements the emitter, because two emitters drift. `Figure.from_profile` skips the guessing
-entirely by ranking candidates for a file and starting from the best one.
+reimplements the emitter, because two emitters drift. `Figure.from_profile` ranks candidates for a
+file and starts from the best one, so there is no guessing at all.
 
 ## Writing a spec
 
@@ -238,20 +263,24 @@ Set `output.interactive` and you also get a self-contained HTML figure through p
 and zoom, which is what a project page wants and a paper does not. Set `output.latex` and you get an
 `\includegraphics` block at the right column width with the caption and alt text already in it.
 
-On manim, with evidence rather than an opinion. It does not install here: `moderngl` and `glcontext`
-fail to build wheels, needing a C toolchain. Even where it does install it draws its own axes rather
-than the ones this spent so long getting right. What actually makes those animations read well is
+On manim, with evidence rather than an opinion. It does not install here, because `moderngl` and
+`glcontext` fail to build wheels without a C toolchain. Even where it installs it draws its own axes
+rather than the ones this spent so long getting right. What makes those animations read well is
 easing and staged construction, and both are a few lines over `FuncAnimation`. The rate functions
-are ports of manim's and keep its names, so `easing: "rush_into"` does what you would expect. plotly
-and scipy install cleanly and are used; scipy makes the t-test and Mann-Whitney options real rather
-than a fallback.
+are ports of manim's and keep its names, so `easing: "rush_into"` does what you would expect.
+
+plotly and scipy do install, and both are used. scipy makes the t-test and Mann-Whitney options real
+rather than a fallback to the bootstrap.
 
 ## What checks the work
 
-Forty-seven rules run on the spec alone, on the server. The rendered figure is checked separately by
-the Python package, which measures text at the width it will be printed, finds colliding tick
-labels, a legend covering data, series a reader cannot separate, series that merge in greyscale, a
-truncated bar axis, and panels that disagree.
+Forty-seven rules run on the server against the spec alone. The Python package checks the rendered
+figure, which is where the rest hide.
+
+It measures every text element at the width the figure will be printed and fails below the venue's
+floor. It compares label positions, so an annotation on the title or an inset crowding its parent
+gets caught. It measures colour distance in CIELAB under three simulated colour vision deficiencies.
+And it refuses a truncated bar axis outright, because a bar's length is its value.
 
 `docs/research.md` maps every rule to the paper or policy behind it. `examples/README.md` covers the
 gallery and why its images are committed.
