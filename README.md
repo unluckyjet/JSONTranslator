@@ -95,7 +95,7 @@ parse.
 
 ```bash
 npm install
-npm test          # 24 unit tests, and python compiles every sample script
+npm test          # 28 unit tests, and python compiles every sample script
 npm run typecheck
 ```
 
