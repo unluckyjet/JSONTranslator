@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { Readable } from "node:stream";
 import { GET as mcpGet, POST as mcpPost, DELETE as mcpDelete } from "../api/mcp.ts";
 import { POST as convertPost } from "../api/convert.ts";
+import { POST as suggestPost } from "../api/suggest.ts";
 import { GET as healthGet } from "../api/health.ts";
 
 /**
@@ -14,6 +15,7 @@ type Handler = (request: Request) => Response | Promise<Response>;
 const routes: Record<string, Partial<Record<string, Handler>>> = {
   "/api/mcp": { GET: mcpGet, POST: mcpPost, DELETE: mcpDelete },
   "/api/convert": { POST: convertPost },
+  "/api/suggest": { POST: suggestPost },
   "/api/health": { GET: healthGet },
 };
 

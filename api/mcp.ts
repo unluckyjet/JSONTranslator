@@ -6,6 +6,7 @@ import { translate } from "../src/translate.ts";
 import { verify } from "../src/verify.ts";
 import { ProfileSchema, repair, suggestFigures } from "../src/suggest.ts";
 import { designCost } from "../src/perception.ts";
+import { TOOL_VERSION } from "../src/codegen/theme.ts";
 
 function issueList(issues: { path: string; message: string }[]): string {
   return issues.map((i) => `  ${i.path}: ${i.message}`).join("\n");
@@ -233,7 +234,7 @@ const handler = createMcpHandler(
     );
   },
   {
-    serverInfo: { name: "graph-unslopify", version: "0.6.0" },
+    serverInfo: { name: "graph-unslopify", version: TOOL_VERSION },
     verboseLogs: process.env.VERCEL_ENV !== "production",
   },
 );

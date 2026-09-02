@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "graphunslopify"
-version = "0.6.0"
+dynamic = ["version"]
 description = "Render-time readability and accessibility checks for matplotlib figures."
 requires-python = ">=3.10"
 dependencies = ["matplotlib>=3.9", "pandas>=2.0", "numpy>=1.24"]
@@ -17,6 +17,9 @@ graphunslopify = "graphunslopify.cli:main"
 
 [project.urls]
 Source = "https://github.com/unluckyjet/JSONTranslator"
+
+[tool.setuptools.dynamic]
+version = { attr = "graphunslopify.__version__" }
 
 [tool.setuptools.packages.find]
 include = ["graphunslopify*"]
