@@ -47,6 +47,19 @@ test("an unknown field names the column the author probably meant", () => {
   assert.match(finding.message, /Did you mean "accuracy"\?/);
 });
 
+test("an abbreviated field finds the column it is short for", () => {
+  const result = verify(
+    FigureSpec.parse({
+      ...line,
+      y: { field: "acc", label: "A" },
+      data: { columns: ["epoch", "accuracy", "model"] },
+    }),
+  );
+  const finding = result.find((f) => f.code === "unknown_field");
+  assert.ok(finding);
+  assert.match(finding.message, /Did you mean "accuracy"\?/);
+});
+
 test("a wildly wrong field gets no misleading suggestion", () => {
   const result = verify(
     FigureSpec.parse({ ...line, y: { field: "zzzz", label: "A" }, data: { columns: ["epoch", "accuracy"] } }),

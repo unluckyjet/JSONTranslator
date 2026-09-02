@@ -135,7 +135,6 @@ const convert = await fetch(`${base}/api/convert`, {
 }).then((r) => r.json());
 check("POST /api/convert", convert?.status === "translated" && convert?.ok === true, convert);
 
-console.log(failures === 0 ? "
-all checks passed" : `
-${failures} check(s) failed`);
+console.log("");
+console.log(failures === 0 ? "all checks passed" : `${failures} check(s) failed`);
 process.exitCode = failures === 0 ? 0 : 1;

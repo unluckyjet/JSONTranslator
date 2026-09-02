@@ -35,10 +35,29 @@ function editDistance(a: string, b: string): number {
   return rows[a.length]![b.length]!;
 }
 
+/**
+ * The column the author probably meant.
+ *
+ * Two mistakes matter and they need different measures. A typo is close by edit
+ * distance. An abbreviation, "acc" for "accuracy", is far by edit distance but
+ * is a prefix, and an agent shortening a column name is at least as common as
+ * mistyping one.
+ */
 function nearest(field: string, columns: string[]): string | undefined {
+  const needle = field.toLowerCase();
+
+  const abbreviations = columns.filter((column) => {
+    const candidate = column.toLowerCase();
+    return candidate !== needle && (candidate.startsWith(needle) || needle.startsWith(candidate));
+  });
+  if (abbreviations.length === 1) return abbreviations[0];
+  if (abbreviations.length > 1) {
+    return abbreviations.reduce((a, b) => (a.length <= b.length ? a : b));
+  }
+
   let best: { name: string; score: number } | undefined;
   for (const column of columns) {
-    const score = editDistance(field.toLowerCase(), column.toLowerCase());
+    const score = editDistance(needle, column.toLowerCase());
     if (!best || score < best.score) best = { name: column, score };
   }
   if (!best) return undefined;
