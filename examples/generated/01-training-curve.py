@@ -22,7 +22,7 @@ RC_PARAMS = {
 
 FIGSIZE = (3.4, 2.6)
 PALETTE = ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00", "#56B4E9", "#8C564B", "#000000"]
-MUTED = "#bdbdbd"
+RECEDED_ALPHA = 0.4
 
 DATA_PATH = "data/training.csv"
 X_FIELD = "epoch"
@@ -48,10 +48,10 @@ def series_names(frame):
 def series_style(name, index):
     colour = PALETTE[index % len(PALETTE)]
     if EMPHASIS is None:
-        return {"colour": colour, "width": 1.4, "zorder": 2}
+        return {"colour": colour, "width": 1.4, "alpha": 1.0, "zorder": 2}
     if name == EMPHASIS:
-        return {"colour": colour, "width": 2.2, "zorder": 3}
-    return {"colour": MUTED, "width": 1, "zorder": 1}
+        return {"colour": colour, "width": 2.2, "alpha": 1.0, "zorder": 3}
+    return {"colour": colour, "width": 1, "alpha": RECEDED_ALPHA, "zorder": 1}
 
 
 def aggregate(df):
@@ -72,6 +72,7 @@ def draw(ax, df):
             label=str(name),
             color=style["colour"],
             linewidth=style["width"],
+            alpha=style["alpha"],
             zorder=style["zorder"],
         )
 

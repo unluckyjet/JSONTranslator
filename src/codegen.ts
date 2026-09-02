@@ -197,7 +197,8 @@ function emitAggregate(aggregation: string, spec: FigureSpec, out: string[]): vo
   } else {
     out.push(
       `    keys = [X_FIELD${spec.group ? ", GROUP" : ""}]`,
-      `    return df.groupby(keys, as_index=False)[Y_FIELD].${aggregation}()`,
+      "    # sort=False keeps the file's category order instead of an alphabetical one.",
+      `    return df.groupby(keys, as_index=False, sort=False)[Y_FIELD].${aggregation}()`,
     );
   }
   out.push("");
@@ -328,8 +329,14 @@ function emitBarDraw(spec: FigureSpec & { kind: "bar" }, out: string[]): void {
   out.push(
     `    ax.set_${tickAxis}ticks(positions)`,
     `    ax.set_${tickAxis}ticklabels([str(value) for value in categories])`,
-    "",
   );
+  if (!vertical) {
+    out.push(
+      "    # barh puts the first category at the bottom; readers expect it at the top.",
+      "    ax.invert_yaxis()",
+    );
+  }
+  out.push("");
 }
 
 function emitFinish(spec: FigureSpec, out: string[]): void {
@@ -369,8 +376,11 @@ function emitFinish(spec: FigureSpec, out: string[]): void {
       `        title=${pyOptStr(spec.legend.title)},`,
       "        frameon=False,",
       `        ${LEGEND_LOCATIONS[spec.legend.position]},`,
-      "    )",
     );
+    if (spec.legend.position === "outside_bottom") {
+      out.push("        ncol=min(len(ax.get_legend_handles_labels()[0]), 4),");
+    }
+    out.push("    )");
   }
 
   const outsideLegend =

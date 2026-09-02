@@ -22,7 +22,7 @@ RC_PARAMS = {
 
 FIGSIZE = (3.4, 2.6)
 PALETTE = ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00", "#56B4E9", "#8C564B", "#000000"]
-MUTED = "#bdbdbd"
+RECEDED_ALPHA = 0.4
 
 DATA_PATH = "data/benchmarks.csv"
 X_FIELD = "latency_ms"
@@ -48,10 +48,10 @@ def series_names(frame):
 def series_style(name, index):
     colour = PALETTE[index % len(PALETTE)]
     if EMPHASIS is None:
-        return {"colour": colour, "size": 18, "zorder": 2}
+        return {"colour": colour, "size": 18, "alpha": 1.0, "zorder": 2}
     if name == EMPHASIS:
-        return {"colour": colour, "size": 30, "zorder": 3}
-    return {"colour": MUTED, "size": 12, "zorder": 1}
+        return {"colour": colour, "size": 30, "alpha": 1.0, "zorder": 3}
+    return {"colour": colour, "size": 12, "alpha": RECEDED_ALPHA, "zorder": 1}
 
 
 def draw(ax, df):
@@ -65,6 +65,7 @@ def draw(ax, df):
             label=str(name),
             color=style["colour"],
             s=style["size"],
+            alpha=style["alpha"],
             zorder=style["zorder"],
         )
 

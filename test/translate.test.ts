@@ -117,7 +117,7 @@ test("an unaggregated line chart carries a runtime duplicate check", () => {
 test("an aggregated line chart groups instead of warning", () => {
   const result = translated({ ...line, aggregation: "mean" });
   assert.ok(!result.code.includes("warn_duplicates"));
-  assert.match(result.code, /groupby\(keys, as_index=False\)\[Y_FIELD\]\.mean\(\)/);
+  assert.match(result.code, /groupby\(keys, as_index=False, sort=False\)\[Y_FIELD\]\.mean\(\)/);
 });
 
 test("recessive series keep their own colour instead of collapsing to one grey", () => {
@@ -130,6 +130,32 @@ test("recessive series keep their own colour instead of collapsing to one grey",
   assert.match(result.code, /"colour": colour, "width": [\d.]+, "alpha": RECEDED_ALPHA/);
   assert.ok(!result.code.includes("MUTED"));
   assert.match(result.code, /alpha=style\["alpha"\]/);
+});
+
+test("aggregation keeps the file's category order", () => {
+  const result = translated({ ...line, kind: "bar", aggregation: "mean" });
+  assert.match(result.code, /groupby\(keys, as_index=False, sort=False\)/);
+});
+
+test("a horizontal bar reads top to bottom", () => {
+  const horizontal = translated({
+    ...line,
+    kind: "bar",
+    aggregation: "mean",
+    orientation: "horizontal",
+  });
+  assert.match(horizontal.code, /ax\.invert_yaxis\(\)/);
+
+  const vertical = translated({ ...line, kind: "bar", aggregation: "mean" });
+  assert.ok(!vertical.code.includes("invert_yaxis"));
+});
+
+test("a legend below the axes lays out as a strip", () => {
+  const below = translated({ ...line, legend: { position: "outside_bottom" } });
+  assert.match(below.code, /ncol=min\(len\(ax\.get_legend_handles_labels\(\)\[0\]\), 4\)/);
+
+  const right = translated({ ...line, legend: { position: "outside_right" } });
+  assert.ok(!right.code.includes("ncol="));
 });
 
 test("output is deterministic", () => {

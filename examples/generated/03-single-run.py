@@ -22,7 +22,7 @@ RC_PARAMS = {
 
 FIGSIZE = (3.4, 2.6)
 PALETTE = ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00", "#56B4E9", "#8C564B", "#000000"]
-MUTED = "#bdbdbd"
+RECEDED_ALPHA = 0.4
 
 DATA_PATH = "data/training.csv"
 X_FIELD = "epoch"
