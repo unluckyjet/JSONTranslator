@@ -3,21 +3,20 @@
   "version": "0.6.0",
   "description": "MCP server that turns a semantic figure spec into runnable matplotlib code.",
   "scripts": {
-    "test": "node --test \"test/**/*.test.ts\"",
+    "test": "node --experimental-strip-types --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "dev": "vercel dev",
     "deploy": "vercel deploy --prod",
-    "smoke": "node scripts/smoke.ts",
-    "render-check": "node scripts/render-check.ts",
-    "baseline": "node scripts/baseline.ts",
-    "example-data": "node scripts/make-example-data.ts",
-    "test:python": "python -m pytest python/tests -q",
-    "recipe-check": "node scripts/recipe-check.ts",
-    "compose-check": "node scripts/compose-check.ts"
+    "smoke": "node --experimental-strip-types scripts/smoke.ts",
+    "render-check": "node --experimental-strip-types scripts/render-check.ts",
+    "baseline": "node --experimental-strip-types scripts/baseline.ts",
+    "example-data": "node --experimental-strip-types scripts/make-example-data.ts",
+    "test:python": "python3 -m pytest python/tests -q",
+    "recipe-check": "node --experimental-strip-types scripts/recipe-check.ts",
+    "compose-check": "node --experimental-strip-types scripts/compose-check.ts"
   },
   "type": "module",
   "dependencies": {
-    "@modelcontextprotocol/server": "^2.0.0",
     "mcp-handler": "^2.1.1",
     "zod": "^4.5.4"
   },
@@ -27,6 +26,6 @@
   },
   "private": true,
   "engines": {
-    "node": ">=22"
+    "node": ">=22.6"
   }
 }

@@ -2,8 +2,36 @@
  * End-to-end check against a running deployment. Speaks the MCP Streamable HTTP
  * wire protocol directly, so a pass means a real MCP client can connect.
  *
- *   node scripts/smoke.ts https://your-app.vercel.app
+ *   node --experimental-strip-types scripts/smoke.ts https://your-app.vercel.app
  */
+
+import { FIGURE_KINDS } from "../src/schema.ts";
+
+/** Only the fields these checks read. Every one is optional, so any JSON object satisfies it. */
+type RpcResponse = {
+  result?: {
+    serverInfo?: { name?: string };
+    tools?: { name: string; inputSchema?: unknown }[];
+    content?: { text?: string }[];
+    structuredContent?: { candidates?: { spec?: unknown }[] };
+    isError?: boolean;
+  };
+  error?: { message?: string };
+};
+
+/** Every field these views declare is optional, so any JSON object satisfies them. */
+type HealthBody = { ok?: boolean; kinds?: string[] };
+type ConvertBody = { status?: string; ok?: boolean };
+
+function isJsonObject(value: unknown): value is RpcResponse & HealthBody & ConvertBody {
+  return value !== null && typeof value === "object";
+}
+
+async function readJson(url: string, init?: RequestInit) {
+  const value: unknown = await fetch(url, init).then((r) => r.json());
+  if (!isJsonObject(value)) throw new Error(`${url} did not return a JSON object`);
+  return value;
+}
 
 const base = (process.argv[2] ?? "http://localhost:3000").replace(/\/$/, "");
 const mcpUrl = `${base}/api/mcp`;
@@ -18,7 +46,7 @@ function check(name: string, ok: boolean, detail: unknown): void {
   }
 }
 
-async function rpc(method: string, params: unknown, id: number): Promise<any> {
+async function rpc(method: string, params: unknown, id: number): Promise<RpcResponse> {
   const response = await fetch(mcpUrl, {
     method: "POST",
     headers: {
@@ -32,12 +60,16 @@ async function rpc(method: string, params: unknown, id: number): Promise<any> {
   if (!response.ok) throw new Error(`${method} -> HTTP ${response.status}: ${text.slice(0, 300)}`);
 
   // Streamable HTTP may answer as JSON or as a single SSE event.
+  let body = text;
   if (text.startsWith("event:") || text.startsWith("data:")) {
     const line = text.split("\n").find((l) => l.startsWith("data:"));
     if (!line) throw new Error(`${method} -> SSE with no data frame: ${text.slice(0, 300)}`);
-    return JSON.parse(line.slice("data:".length).trim());
+    body = line.slice("data:".length).trim();
   }
-  return JSON.parse(text);
+
+  const parsed: unknown = JSON.parse(body);
+  if (!isJsonObject(parsed)) throw new Error(`${method} -> response is not a JSON object`);
+  return parsed;
 }
 
 const SPEC = {
@@ -54,9 +86,9 @@ const SPEC = {
   legend: { position: "outside_right" },
 };
 
-const health = await fetch(`${base}/api/health`).then((r) => r.json());
+const health = await readJson(`${base}/api/health`);
 check("GET /api/health", health?.ok === true, health);
-check("health lists all six kinds", (health?.kinds ?? []).length === 6, health?.kinds);
+check("health lists every kind", (health?.kinds ?? []).length === FIGURE_KINDS.length, health?.kinds);
 
 const init = await rpc(
   "initialize",
@@ -66,7 +98,7 @@ const init = await rpc(
 check("MCP initialize", init.result?.serverInfo?.name === "graph-unslopify", init);
 
 const tools = await rpc("tools/list", {}, 2);
-const names: string[] = (tools.result?.tools ?? []).map((t: { name: string }) => t.name);
+const names: string[] = (tools.result?.tools ?? []).map((t) => t.name);
 for (const wanted of [
   "figure_to_matplotlib",
   "validate_spec",
@@ -78,7 +110,7 @@ for (const wanted of [
   check(`tools/list exposes ${wanted}`, names.includes(wanted), names);
 }
 
-const tool = tools.result?.tools?.find((t: { name: string }) => t.name === "figure_to_matplotlib");
+const tool = tools.result?.tools?.find((t) => t.name === "figure_to_matplotlib");
 const schema = JSON.stringify(tool?.inputSchema ?? {});
 check("the schema advertises uncertainty", schema.includes("uncertainty"), schema.slice(0, 200));
 check("the schema advertises faceting", schema.includes("facet"), schema.slice(0, 200));
@@ -202,11 +234,11 @@ check("claims reach the script", claimedText.includes("def verify_claims"), clai
 check("alt text is generated", claimedText.includes("ENCODING_SENTENCE"), claimedText.slice(0, 200));
 check("latex is written", claimedText.includes("def write_latex"), claimedText.slice(0, 200));
 
-const convert = await fetch(`${base}/api/convert`, {
+const convert = await readJson(`${base}/api/convert`, {
   method: "POST",
   headers: { "content-type": "application/json" },
   body: JSON.stringify(SPEC),
-}).then((r) => r.json());
+});
 check("POST /api/convert", convert?.status === "translated" && convert?.ok === true, convert);
 
 console.log("");
