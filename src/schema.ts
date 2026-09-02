@@ -14,13 +14,14 @@ import { z } from "zod";
  */
 
 export const AxisSpec = z.object({
-  field: z.string().min(1).describe("Column name in the data file."),
-  label: z.string().min(1).describe("Axis label as it should read in the paper."),
+  field: z.string().min(1).describe("Column name in the data file.").meta({ examples: ["epoch", "accuracy"] }),
+  label: z.string().min(1).describe("Axis label as it should read in the paper.").meta({ examples: ["Training epoch", "Top-1 accuracy"] }),
   unit: z
     .string()
     .min(1)
     .optional()
-    .describe('Unit appended to the label in parentheses, such as "%" or "ms".'),
+    .describe('Unit appended to the label in parentheses, such as "%" or "ms".')
+    .meta({ examples: ["%", "ms", "M", "pp"] }),
   scale: z
     .enum(["linear", "log", "symlog"])
     .default("linear")
@@ -207,7 +208,12 @@ export const SeriesFromColumnsSpec = z.object({
 
 const base = {
   title: z.string().min(1).optional(),
-  group: z.string().min(1).optional().describe("Column that splits the data into series."),
+  group: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Column that splits the data into series.")
+    .meta({ examples: ["model", "method", "dataset"] }),
   series_order: z
     .array(z.string().min(1))
     .min(1)

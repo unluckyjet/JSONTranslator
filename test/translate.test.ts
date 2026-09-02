@@ -36,7 +36,7 @@ test("a minimal line spec produces a script and no complaints", () => {
 });
 
 test("an unknown chart kind is rejected", () => {
-  const result = translate({ ...line, kind: "violin" });
+  const result = translate({ ...line, kind: "sankey" });
   assert.equal(result.status, "invalid_spec");
 });
 
@@ -117,7 +117,8 @@ test("an unaggregated line chart carries a runtime duplicate check", () => {
 test("an aggregated line chart groups instead of warning", () => {
   const result = translated({ ...line, aggregation: "mean" });
   assert.ok(!result.code.includes("warn_duplicates"));
-  assert.match(result.code, /groupby\(keys, as_index=False, sort=False\)\[Y_FIELD\]\.mean\(\)/);
+  assert.match(result.code, /groupby\(keys, as_index=False, sort=False\)\[Y_FIELD\]/);
+  assert.match(result.code, /summary = grouped\.mean\(\)/);
 });
 
 test("recessive series keep their own colour instead of collapsing to one grey", () => {
@@ -152,7 +153,7 @@ test("a horizontal bar reads top to bottom", () => {
 
 test("a legend below the axes lays out as a strip", () => {
   const below = translated({ ...line, legend: { position: "outside_bottom" } });
-  assert.match(below.code, /ncol=min\(len\(ax\.get_legend_handles_labels\(\)\[0\]\), 4\)/);
+  assert.match(below.code, /ncol=min\(len\(handles\), 4\)/);
 
   const right = translated({ ...line, legend: { position: "outside_right" } });
   assert.ok(!right.code.includes("ncol="));
@@ -205,13 +206,14 @@ test("the render-time checker is called but never required", () => {
   assert.match(result.code, /from graphunslopify import inspect_figure/);
   assert.match(result.code, /except ImportError:/);
   assert.match(result.code, /skipping figure checks/);
-  assert.match(result.code, /target_width_in=3\.4/);
+  assert.match(result.code, /TARGET_WIDTH_IN = 3\.4/);
+  assert.match(result.code, /target_width_in=TARGET_WIDTH_IN/);
   assert.match(result.code, /check\(fig\)/);
 });
 
 test("a double column figure tells the checker its real target width", () => {
   const result = translated({ ...line, output: { size: "double_column" } });
-  assert.match(result.code, /target_width_in=7/);
+  assert.match(result.code, /TARGET_WIDTH_IN = 7/);
 });
 
 test("the emphasised series stays solid while the rest are dashed", () => {

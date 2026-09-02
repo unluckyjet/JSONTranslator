@@ -29,6 +29,22 @@ def _read(path: Path) -> Any:
     return pd.read_csv(path)
 
 
+def _looks_like_an_index(series: Any) -> bool:
+    """An epoch or a seed is a complete run of integers starting at 0 or 1.
+
+    Measured integers are not. An accuracy column of whole percentages runs from
+    something like 52 to 72, so requiring the run to start at 0 or 1 separates
+    the axis a curve travels along from the quantity being measured.
+    """
+    values = series.dropna()
+    if values.empty or not (values % 1 == 0).all():
+        return False
+    low, high = int(values.min()), int(values.max())
+    if low not in (0, 1):
+        return False
+    return values.nunique() == high - low + 1
+
+
 def _role(series: Any, rows: int) -> str:
     """A guess at what the column is for, which is what a spec needs to know."""
     import pandas as pd
@@ -37,7 +53,7 @@ def _role(series: Any, rows: int) -> str:
     if pd.api.types.is_numeric_dtype(series):
         if distinct <= 2:
             return "flag"
-        if distinct <= CATEGORICAL_CEILING and (series.dropna() % 1 == 0).all():
+        if distinct <= CATEGORICAL_CEILING and _looks_like_an_index(series):
             return "ordinal"
         return "measure"
     if distinct <= CATEGORICAL_CEILING:
