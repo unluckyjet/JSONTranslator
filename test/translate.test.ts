@@ -206,6 +206,17 @@ test("a double column figure tells the checker its real target width", () => {
   assert.match(result.code, /target_width_in=7/);
 });
 
+test("the emphasised series stays solid while the rest are dashed", () => {
+  const result = translated({
+    ...line,
+    series_order: ["a", "b", "c", "d"],
+    emphasis: { series: "d" },
+  });
+  assert.ok(result.code.includes("if name == EMPHASIS:"));
+  assert.ok(result.code.includes('channel = "-"'));
+  assert.ok(result.code.includes("LINE_STYLES[index % len(LINE_STYLES)]"));
+});
+
 test("output is deterministic", () => {
   assert.equal(translated(line).code, translated(line).code);
 });
