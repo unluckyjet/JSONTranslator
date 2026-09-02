@@ -61,9 +61,7 @@ def simulate(rgb: RGB, deficiency: str) -> RGB:
     """Re-render a colour as someone with the named deficiency would see it."""
     matrix = DICHROMACY_MATRICES[deficiency]
     linear = [_to_linear(channel) for channel in rgb]
-    converted = [
-        row[0] * linear[0] + row[1] * linear[1] + row[2] * linear[2] for row in matrix
-    ]
+    converted = [row[0] * linear[0] + row[1] * linear[1] + row[2] * linear[2] for row in matrix]
     return tuple(_to_srgb(channel) for channel in converted)  # type: ignore[return-value]
 
 

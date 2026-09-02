@@ -162,7 +162,9 @@ class Figure:
 
     # --- marking up -------------------------------------------------------
 
-    def reference(self, axis: str, value: float, label: str | None = None, meaning: str = "other") -> Self:
+    def reference(
+        self, axis: str, value: float, label: str | None = None, meaning: str = "other"
+    ) -> Self:
         line: dict[str, Any] = {"axis": axis, "value": value, "meaning": meaning}
         if label:
             line["label"] = label
@@ -207,7 +209,9 @@ class Figure:
         self.spec["repeat"] = {"fields": list(fields), "columns": columns}
         return self
 
-    def zoom(self, x: tuple[float, float], y: tuple[float, float], corner: str = "lower_right") -> Self:
+    def zoom(
+        self, x: tuple[float, float], y: tuple[float, float], corner: str = "lower_right"
+    ) -> Self:
         self.spec["inset"] = {"x": list(x), "y": list(y), "corner": corner}
         return self
 

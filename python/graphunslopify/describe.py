@@ -85,10 +85,12 @@ def profile(path: str | Path) -> dict[str, Any]:
             entry["min"] = float(series.min())
             entry["max"] = float(series.max())
             entry["mean"] = float(series.mean())
-        if entry["role"] in {"category", "flag", "ordinal"} and entry["distinct"] <= MAX_LISTED_CATEGORIES:
+        if (
+            entry["role"] in {"category", "flag", "ordinal"}
+            and entry["distinct"] <= MAX_LISTED_CATEGORIES
+        ):
             entry["values"] = [
-                (v.item() if hasattr(v, "item") else v)
-                for v in series.dropna().unique().tolist()
+                (v.item() if hasattr(v, "item") else v) for v in series.dropna().unique().tolist()
             ]
         columns.append(entry)
 
@@ -97,9 +99,7 @@ def profile(path: str | Path) -> dict[str, Any]:
     # The ordinal a curve runs along has many steps. A replicate index has few,
     # so ranking by distinct count picks epoch over seed.
     ordinals = [
-        c["name"]
-        for c in sorted(columns, key=lambda c: -c["distinct"])
-        if c["role"] == "ordinal"
+        c["name"] for c in sorted(columns, key=lambda c: -c["distinct"]) if c["role"] == "ordinal"
     ]
 
     report: dict[str, Any] = {
@@ -119,9 +119,7 @@ def profile(path: str | Path) -> dict[str, Any]:
                 continue
             duplicated = int(frame.duplicated(subset=[x_name, group]).sum())
             if duplicated:
-                repeats.append(
-                    {"x": x_name, "group": group, "repeated_rows": duplicated}
-                )
+                repeats.append({"x": x_name, "group": group, "repeated_rows": duplicated})
     report["repeats"] = repeats[:10]
 
     hint: dict[str, Any] = {}
@@ -135,9 +133,7 @@ def profile(path: str | Path) -> dict[str, Any]:
         candidates = [c for c in categories if c != hint.get("x")]
         if candidates:
             hint["group"] = candidates[0]
-    matching = [
-        r for r in repeats if r["x"] == hint.get("x") and r["group"] == hint.get("group")
-    ]
+    matching = [r for r in repeats if r["x"] == hint.get("x") and r["group"] == hint.get("group")]
     if hint and matching:
         hint["aggregation"] = "mean"
         replicate = [
