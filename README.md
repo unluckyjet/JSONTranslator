@@ -284,3 +284,50 @@ And it refuses a truncated bar axis outright, because a bar's length is its valu
 
 `docs/research.md` maps every rule to the paper or policy behind it. `examples/README.md` covers the
 gallery and why its images are committed.
+
+## The gallery, rebuilt and measured
+
+Fourteen figures, one per branch of the emitter. They used to be built by POSTing each spec to the
+deployed API, which meant the committed images recorded whatever happened to be live rather than
+what the code in the tree does. They had fallen a version behind without anyone noticing. Every
+script in `examples/generated` claimed 0.5.0 while the emitter stamped 0.6.0. They are translated
+locally now, and `npm run baseline -- --check` fails if the two ever separate again.
+
+| | |
+| --- | --- |
+| ![Line chart of test accuracy against training epoch, one series per model, ours in the foreground reaching 81.1 against baseline at 70](examples/baseline/01-training-curve.png) | ![The same four models on a logarithmic loss axis, ending between 0.281 and 0.302](examples/baseline/02-loss-log.png) |
+| `01-training-curve`, mean over seeds with the argued series in front | `02-loss-log`, log axis and median aggregation |
+| ![Single ungrouped accuracy curve running from 8.48 to 82 with no legend](examples/baseline/03-single-run.png) | ![Grouped bars of top-1 accuracy per dataset, ours highest at 51.2 and baseline lowest at 43.8](examples/baseline/04-accuracy-by-dataset.png) |
+| `03-single-run`, no group, legend suppressed | `04-accuracy-by-dataset`, grouped bars with the legend below |
+| ![Horizontal bars of latency by model, ranging from 12.2 to 65.7 milliseconds](examples/baseline/05-latency-ranking.png) | ![Scatter of accuracy against latency, one marker shape per model, legend sitting over two points](examples/baseline/06-accuracy-vs-latency.png) |
+| `05-latency-ranking`, horizontal bars sorted by value | `06-accuracy-vs-latency`, one marker shape per series |
+| ![Ungrouped scatter of accuracy against parameter count with a linear fit](examples/baseline/07-params-trendline.png) | ![The four training curves at double column width in the compact preset](examples/baseline/08-compact-double-column.png) |
+| `07-params-trendline`, linear fit on an ungrouped scatter | `08-compact-double-column`, compact preset at double width |
+| ![Four training curves with shaded 95 percent confidence intervals and a chance line at 25](examples/baseline/09-uncertainty-band.png) | ![Three panels of accuracy bars, one per dataset, sharing a y axis and one legend](examples/baseline/10-faceted-benchmarks.png) |
+| `09-uncertainty-band`, bootstrap intervals and a labelled chance line | `10-faceted-benchmarks`, one panel per dataset |
+| ![Box plot of accuracy across epochs per model, values from 65.3 to 82](examples/baseline/11-seed-spread.png) | ![Heatmap of validation accuracy over learning rate and batch size, largest 82.4 at 0.001 and 32](examples/baseline/12-sweep-heatmap.png) |
+| `11-seed-spread`, distribution behind the summary | `12-sweep-heatmap`, annotated cells and a labelled colourbar |
+| ![The four curves labelled at the end of each line with no legend box](examples/baseline/13-direct-labels.png) | ![The same training curves drawing themselves as an animation](examples/baseline/14-animated-curve.gif) |
+| `13-direct-labels`, names at the end of each line | `14-animated-curve`, the same figure as a gif |
+
+Each alt string above is a trimmed version of the one the script itself printed, numbers kept. The
+full sentences are longer, and the scripts write them into the exported files.
+
+### What the checker says about its own gallery
+
+Running all fourteen through the render-time checker in `python/graphunslopify` is the part I did not
+expect to enjoy. Eleven come back clean. Three do not, and all three are right.
+
+`02-loss-log` draws a minus sign on top of a log-axis tick label. `06-accuracy-vs-latency` puts the
+legend over two data points, which you can see above at roughly 49ms and 66ms. `10-faceted-benchmarks`
+overlaps "baseline" and "+augment" on the x axis of all three panels.
+
+None of them are new. Rendering the scripts committed before this change reproduces all three, so the
+gallery has been shipping figures its own tool would reject. That is a decent argument for the tool
+and a poor look for the gallery. Fixing the three specs belongs in its own change rather than a quiet
+edit here.
+
+One figure got better on its own. `06-accuracy-vs-latency` reported four findings before and reports
+one now. The two that went away are `greyscale_collision` and `series_indistinguishable`. The emitter
+had already learned to fix both by giving each series its own marker shape, and the gallery had
+simply never picked the fix up, because it was still being built from a deployment that predated it.

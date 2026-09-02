@@ -13,5 +13,12 @@ __pycache__/
 build/
 dist/
 
+# A generated script writes its figure beside the data it reads, so running one
+# by hand drops files here. The committed copies live in examples/baseline.
+examples/*.png
+examples/*.svg
+examples/*.pdf
+examples/*.gif
+
 # macOS
 .DS_Store
