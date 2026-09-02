@@ -13,8 +13,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RECIPES } from "../src/recipes.ts";
 import { translate } from "../src/translate.ts";
+import { failureDetail } from "./exec-failure.ts";
+import { resolvePython } from "./python.ts";
 
-const python = process.argv[2] ?? "python";
+const python = process.argv[2] ?? resolvePython();
+if (!python) {
+  console.log("no Python interpreter found; set PYTHON or pass one as the first argument");
+  process.exit(1);
+}
 const dir = mkdtempSync(join(tmpdir(), "gu-recipes-"));
 
 let seed = 7;
@@ -104,9 +110,10 @@ for (const recipe of RECIPES) {
   }
 
   const stem = recipe.name;
-  const spec = { ...recipe.spec } as Record<string, unknown>;
-  spec.output = { ...(spec.output as object ?? {}), stem, formats: ["png"], dpi: 150 };
-  const rerun = translate(spec);
+  const rerun = translate({
+    ...recipe.spec,
+    output: { ...recipe.spec.output, stem, formats: ["png"], dpi: 150 },
+  });
   if (rerun.status !== "translated") {
     console.log(`FAIL  ${recipe.name}  rejected on rerun`);
     failures += 1;
@@ -126,8 +133,7 @@ for (const recipe of RECIPES) {
     console.log(`${produced ? "PASS" : "FAIL"}  ${stem}${notes ? `  (${notes} finding(s))` : ""}`);
     if (!produced) failures += 1;
   } catch (error) {
-    const detail = (error as { stderr?: string }).stderr ?? String(error);
-    console.log(`FAIL  ${stem}  ${detail.trim().split("\n").slice(-3).join(" | ")}`);
+    console.log(`FAIL  ${stem}  ${failureDetail(error, 3)}`);
     failures += 1;
   }
 }

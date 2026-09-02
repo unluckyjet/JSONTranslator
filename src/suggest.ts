@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { designCost } from "./perception.ts";
 import { FigureSpec } from "./schema.ts";
 import { hasErrors, verify, type Finding } from "./verify.ts";
@@ -14,21 +15,36 @@ import { hasErrors, verify, type Finding } from "./verify.ts";
  * not have to reshape anything between the two calls.
  */
 
-export type Column = {
-  name: string;
-  role: "measure" | "category" | "ordinal" | "flag" | "identifier";
-  distinct: number;
-  min?: number;
-  max?: number;
-};
+/**
+ * What `graphunslopify describe` prints, as the one place that shape is written.
+ *
+ * Loose because describe reports more per column than the ranking reads, and
+ * dropping the rest would make the profile a client passes through lossy.
+ */
+export const ColumnSchema = z
+  .object({
+    name: z.string(),
+    role: z.enum(["measure", "category", "ordinal", "flag", "identifier"]),
+    distinct: z.number(),
+    min: z.number().optional(),
+    max: z.number().optional(),
+  })
+  .loose();
 
-export type Profile = {
-  columns: Column[];
-  repeats?: { x: string; group: string; repeated_rows: number }[];
-};
+export const ProfileSchema = z
+  .object({
+    columns: z.array(ColumnSchema),
+    repeats: z
+      .array(z.object({ x: z.string(), group: z.string(), repeated_rows: z.number() }))
+      .optional(),
+  })
+  .loose();
+
+export type Column = z.infer<typeof ColumnSchema>;
+export type Profile = z.infer<typeof ProfileSchema>;
 
 export type Candidate = {
-  spec: Record<string, unknown>;
+  spec: FigureSpec;
   cost: number;
   why: string;
   reasons: string[];
@@ -163,7 +179,7 @@ export function suggestFigures(profile: Profile, limit = 3): Candidate[] {
     const { total, reasons } = designCost(parsed.data);
     const warnings = findings.filter((f) => f.severity === "warning").length;
     scored.push({
-      spec: candidate.spec,
+      spec: parsed.data,
       cost: total + warnings,
       why: candidate.why,
       reasons: [...reasons, ...(warnings ? [`${warnings} lint warning(s)`] : [])],

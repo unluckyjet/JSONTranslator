@@ -15,10 +15,7 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const spec =
-    body !== null && typeof body === "object" && "spec" in body
-      ? (body as { spec: unknown }).spec
-      : body;
+  const spec = body !== null && typeof body === "object" && "spec" in body ? body.spec : body;
 
   const result = translate(spec);
   const status = result.status === "invalid_spec" ? 400 : result.ok ? 200 : 422;

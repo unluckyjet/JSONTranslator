@@ -13,8 +13,14 @@ import { mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { translate } from "../src/translate.ts";
+import { failureDetail } from "./exec-failure.ts";
+import { resolvePython } from "./python.ts";
 
-const python = process.argv[2] ?? "python";
+const python = process.argv[2] ?? resolvePython();
+if (!python) {
+  console.log("no Python interpreter found; set PYTHON or pass one as the first argument");
+  process.exit(1);
+}
 const dir = mkdtempSync(join(tmpdir(), "gu-compose-"));
 
 let seed = 31;
@@ -166,8 +172,7 @@ for (const [name, spec] of CASES) {
     console.log(`${ok ? "PASS" : "FAIL"}  ${name}${extras.length ? `  also wrote ${extras.join(", ")}` : ""}`);
     if (!ok) failures += 1;
   } catch (error) {
-    const detail = (error as { stderr?: string }).stderr ?? String(error);
-    console.log(`FAIL  ${name}  ${detail.trim().split("\n").slice(-3).join(" | ")}`);
+    console.log(`FAIL  ${name}  ${failureDetail(error, 3)}`);
     failures += 1;
   }
 }

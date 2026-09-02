@@ -20,6 +20,7 @@ import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "nod
 import { join } from "node:path";
 import { FigureSpec } from "../src/schema.ts";
 import { translate } from "../src/translate.ts";
+import { failureDetail } from "./exec-failure.ts";
 
 const check = process.argv.includes("--check");
 const python = process.env.PYTHON ?? "python3";
@@ -106,8 +107,7 @@ if (check) {
         encoding: "utf8",
       });
     } catch (error) {
-      const detail = error instanceof Error && "stderr" in error ? String(error.stderr) : String(error);
-      console.log(`FAIL  ${entry.name}  ${detail.trim().split("\n").slice(-2).join(" | ")}`);
+      console.log(`FAIL  ${entry.name}  ${failureDetail(error, 2)}`);
       failures += 1;
       continue;
     }

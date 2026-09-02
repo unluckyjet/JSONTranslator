@@ -1,4 +1,4 @@
-import { suggestFigures } from "../src/suggest.ts";
+import { ProfileSchema, suggestFigures } from "../src/suggest.ts";
 
 /**
  * Ranked candidate figures for a data profile.
@@ -14,15 +14,31 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "body is not valid JSON" }, { status: 400 });
   }
 
-  const payload = body as { profile?: unknown; limit?: number };
-  const profile = payload?.profile ?? body;
-  if (!profile || typeof profile !== "object" || !("columns" in profile)) {
+  const envelope = unwrap(body);
+  const parsed = ProfileSchema.safeParse(envelope.profile ?? body);
+  if (!parsed.success) {
     return Response.json(
-      { error: "expected a profile with a columns array, as graphunslopify describe prints" },
+      {
+        error: "expected a profile with a columns array, as graphunslopify describe prints",
+        issues: parsed.error.issues.map((i) => ({
+          path: i.path.join(".") || "(root)",
+          message: i.message,
+        })),
+      },
       { status: 400 },
     );
   }
 
-  const limit = Math.min(Math.max(payload?.limit ?? 3, 1), 5);
-  return Response.json(suggestFigures(profile as never, limit));
+  const limit = Math.min(Math.max(envelope.limit ?? 3, 1), 5);
+  return Response.json(suggestFigures(parsed.data, limit));
+}
+
+/** The profile may arrive bare or wrapped. Reading both fields is all that needs deciding. */
+function unwrap(body: unknown): { profile?: unknown; limit?: number } {
+  if (body === null || typeof body !== "object") return {};
+  const limit = "limit" in body ? body.limit : undefined;
+  return {
+    profile: "profile" in body ? body.profile : undefined,
+    limit: typeof limit === "number" ? limit : undefined,
+  };
 }

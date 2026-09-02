@@ -4,7 +4,7 @@ import { RECIPES, findRecipe, recipeNames } from "../src/recipes.ts";
 import { FIGURE_KINDS, FigureSpec } from "../src/schema.ts";
 import { translate } from "../src/translate.ts";
 import { verify } from "../src/verify.ts";
-import { repair, suggestFigures } from "../src/suggest.ts";
+import { ProfileSchema, repair, suggestFigures } from "../src/suggest.ts";
 import { designCost } from "../src/perception.ts";
 
 function issueList(issues: { path: string; message: string }[]): string {
@@ -142,26 +142,14 @@ const handler = createMcpHandler(
           "McGill accuracy ranking, so a design that puts the quantity on a weak channel scores " +
           "worse. Use this when you have a file and do not yet know what to plot.",
         inputSchema: z.object({
-          profile: z
-            .object({
-              columns: z.array(
-                z.object({
-                  name: z.string(),
-                  role: z.enum(["measure", "category", "ordinal", "flag", "identifier"]),
-                  distinct: z.number(),
-                }).loose(),
-              ),
-              repeats: z
-                .array(z.object({ x: z.string(), group: z.string(), repeated_rows: z.number() }))
-                .optional(),
-            })
-            .loose()
-            .describe("The output of graphunslopify describe, passed through unchanged."),
+          profile: ProfileSchema.describe(
+            "The output of graphunslopify describe, passed through unchanged.",
+          ),
           limit: z.number().int().min(1).max(5).default(3),
         }),
       },
       async ({ profile, limit }) => {
-        const candidates = suggestFigures(profile as never, limit);
+        const candidates = suggestFigures(profile, limit);
         if (!candidates.length) {
           return {
             content: [

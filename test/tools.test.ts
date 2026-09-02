@@ -4,7 +4,7 @@ import { encodingSentence } from "../src/alttext.ts";
 import { CLAIM_WORDING } from "../src/claims.ts";
 import { CHANNEL_RANK, designCost, encodingSuggestions, primaryChannel } from "../src/perception.ts";
 import { FigureSpec } from "../src/schema.ts";
-import { applyFix, repair, suggestFigures } from "../src/suggest.ts";
+import { applyFix, repair, suggestFigures, type Candidate } from "../src/suggest.ts";
 import { translate } from "../src/translate.ts";
 import { verify } from "../src/verify.ts";
 
@@ -186,17 +186,22 @@ test("suggestions are ranked cheapest first and all of them validate", () => {
 });
 
 test("a repeated x makes the suggestion aggregate and show spread", () => {
-  const curve = suggestFigures(PROFILE).find((c) => c.spec.kind === "line");
+  const curve = suggestFigures(PROFILE).find(
+    (c): c is Candidate & { spec: Extract<FigureSpec, { kind: "line" }> } => c.spec.kind === "line",
+  );
   assert.ok(curve);
-  assert.equal((curve.spec as { aggregation?: string }).aggregation, "mean");
+  assert.equal(curve.spec.aggregation, "mean");
   assert.ok("uncertainty" in curve.spec);
 });
 
 test("the suggestion guesses a unit from the column name", () => {
   const candidates = suggestFigures(PROFILE);
-  const scatter = candidates.find((c) => c.spec.kind === "scatter");
+  const scatter = candidates.find(
+    (c): c is Candidate & { spec: Extract<FigureSpec, { kind: "scatter" }> } =>
+      c.spec.kind === "scatter",
+  );
   assert.ok(scatter);
-  assert.equal((scatter.spec as { x: { unit?: string } }).x.unit, "%");
+  assert.equal(scatter.spec.x.unit, "%");
 });
 
 test("a profile with nothing measurable yields no suggestion", () => {

@@ -6,10 +6,14 @@
  * passes `verify` with no findings once its field names are filled in.
  */
 
+import type { z } from "zod";
+import { FigureSpec } from "./schema.ts";
+
 export type Recipe = {
   name: string;
   purpose: string;
-  spec: Record<string, unknown>;
+  /** The input side of the schema, so a recipe may leave every defaulted field out. */
+  spec: z.input<typeof FigureSpec>;
 };
 
 export const RECIPES: Recipe[] = [

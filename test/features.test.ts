@@ -8,6 +8,7 @@ import { RECIPES } from "../src/recipes.ts";
 import { FigureSpec } from "../src/schema.ts";
 import { translate } from "../src/translate.ts";
 import { verify } from "../src/verify.ts";
+import { resolvePython } from "../scripts/python.ts";
 
 const line = {
   kind: "line",
@@ -306,17 +307,16 @@ test("output is deterministic across every recipe", () => {
 });
 
 test("every recipe compiles as Python", (t) => {
-  try {
-    execFileSync("python", ["--version"], { encoding: "utf8" });
-  } catch {
-    t.skip("python not on PATH");
+  const python = resolvePython();
+  if (!python) {
+    t.skip("no Python interpreter found");
     return;
   }
   const dir = mkdtempSync(join(tmpdir(), "gu-features-"));
   for (const recipe of RECIPES) {
     const file = join(dir, `${recipe.name}.py`);
     writeFileSync(file, translated(recipe.spec).code);
-    execFileSync("python", ["-c", `compile(open(r'''${file}''').read(), 'x', 'exec')`], {
+    execFileSync(python, ["-c", `compile(open(r'''${file}''').read(), 'x', 'exec')`], {
       stdio: "pipe",
     });
   }

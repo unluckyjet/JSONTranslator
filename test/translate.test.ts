@@ -8,6 +8,7 @@ import { translate } from "../src/translate.ts";
 import { verify } from "../src/verify.ts";
 import { FigureSpec } from "../src/schema.ts";
 import { z } from "zod";
+import { resolvePython } from "../scripts/python.ts";
 
 const line = {
   kind: "line",
@@ -302,11 +303,9 @@ const SAMPLES: [string, unknown][] = [
 ];
 
 test("every emitted script is valid Python", (t) => {
-  let python: string;
-  try {
-    python = execFileSync("python", ["--version"], { encoding: "utf8" }).trim();
-  } catch {
-    t.skip("python not on PATH");
+  const python = resolvePython();
+  if (!python) {
+    t.skip("no Python interpreter found");
     return;
   }
 
@@ -315,9 +314,8 @@ test("every emitted script is valid Python", (t) => {
     const result = translated(spec);
     const file = join(dir, `${name.replace(/\s+/g, "_")}.py`);
     writeFileSync(file, result.code);
-    execFileSync("python", ["-c", `compile(open(r'''${file}''').read(), 'x', 'exec')`], {
+    execFileSync(python, ["-c", `compile(open(r'''${file}''').read(), 'x', 'exec')`], {
       stdio: "pipe",
     });
   }
-  assert.ok(python.startsWith("Python"));
 });

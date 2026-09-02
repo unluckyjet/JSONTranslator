@@ -13,8 +13,14 @@ import { mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { translate } from "../src/translate.ts";
+import { failureDetail } from "./exec-failure.ts";
+import { resolvePython } from "./python.ts";
 
-const python = process.argv[2] ?? "python";
+const python = process.argv[2] ?? resolvePython();
+if (!python) {
+  console.log("no Python interpreter found; set PYTHON or pass one as the first argument");
+  process.exit(1);
+}
 
 const base = {
   x: { field: "epoch", label: "Training epoch" },
@@ -72,9 +78,7 @@ for (const [name, spec] of CASES) {
   try {
     execFileSync(python, [file], { cwd: dir, stdio: "pipe", encoding: "utf8" });
   } catch (error) {
-    const detail = error as { stderr?: string };
-    const last = (detail.stderr ?? String(error)).trim().split("\n").slice(-3).join(" | ");
-    console.log(`FAIL  ${name}  ${last}`);
+    console.log(`FAIL  ${name}  ${failureDetail(error, 3)}`);
     failures += 1;
     continue;
   }
