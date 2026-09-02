@@ -132,7 +132,7 @@ const handler = createMcpHandler(
     );
   },
   {
-    serverInfo: { name: "graph-unslopify", version: "0.4.0" },
+    serverInfo: { name: "graph-unslopify", version: "0.5.0" },
     verboseLogs: process.env.VERCEL_ENV !== "production",
   },
 );

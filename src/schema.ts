@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ClaimSpec } from "./claims.ts";
 
 /**
  * What an agent is allowed to say about a figure.
@@ -60,6 +61,17 @@ export const LegendSpec = z.object({
 export const VENUES = ["none", "neurips", "icml", "iclr", "nature", "ieee"] as const;
 
 export const OutputSpec = z.object({
+  interactive: z
+    .boolean()
+    .default(false)
+    .describe(
+      "Also emit a self-contained HTML figure with hover, zoom and legend toggling, for a " +
+        "project page or supplementary material. Needs plotly.",
+    ),
+  latex: z
+    .boolean()
+    .default(false)
+    .describe("Also write a .tex block with the includegraphics, caption and alt text filled in."),
   size: z
     .enum(["single_column", "double_column"])
     .default("single_column")
@@ -234,6 +246,31 @@ const base = {
   style: StyleSpec.prefault({}),
   data: DataSpec.prefault({}),
   animate: AnimateSpec.optional(),
+  claims: z
+    .array(ClaimSpec)
+    .min(1)
+    .optional()
+    .describe(
+      "What the figure is meant to show. The script tests each one against the data and refuses " +
+        "to let a caption assert something the figure does not support.",
+    ),
+  alt_text: z
+    .string()
+    .min(20)
+    .optional()
+    .describe(
+      "Context a reader needs that the data cannot supply, which is level four of the alt text " +
+        "model. Levels one to three are generated. Leave this out rather than guessing.",
+    ),
+  caption: z.string().min(10).optional().describe("The caption, used by the LaTeX output."),
+  palette_lock: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "Path to a lock file shared by every figure in one paper, so a model keeps its colour and " +
+        "marker across figure 1 and figure 7.",
+    ),
 };
 
 const xy = { ...base, x: AxisSpec, y: AxisSpec };

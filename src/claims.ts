@@ -1,0 +1,178 @@
+import { z } from "zod";
+
+/**
+ * What the figure is supposed to show, stated so the data can be asked.
+ *
+ * The integrity literature keeps describing the same failure. A caption asserts
+ * a gain while the axis is truncated, or says "consistently outperforms" over a
+ * chart where it does not. Neither is visible to a pixel checker, because the
+ * checker cannot read the manuscript, and neither is visible to a spec checker,
+ * because the spec does not carry the claim.
+ *
+ * So the spec carries the claim, and the generated script tests it against the
+ * data before the figure is written. A claim that fails is an error before
+ * submission rather than a comment from reviewer two.
+ */
+
+export const CLAIM_KINDS = [
+  "beats_everywhere",
+  "beats_on_average",
+  "beats_at_end",
+  "gap_widens",
+  "gap_narrows",
+  "monotone_increasing",
+  "monotone_decreasing",
+  "converges",
+  "no_worse_than",
+  "within_tolerance",
+] as const;
+
+export const ClaimSpec = z.object({
+  kind: z.enum(CLAIM_KINDS).describe("The shape of the assertion the figure is making."),
+  subject: z.string().min(1).describe("The series the claim is about."),
+  reference: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("The series it is compared against. Required by every comparative claim."),
+  tolerance: z
+    .number()
+    .min(0)
+    .optional()
+    .describe("Allowed slack in y units, for no_worse_than and within_tolerance."),
+  text: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("The sentence the caption will make, recorded alongside the verdict."),
+});
+export type ClaimSpec = z.infer<typeof ClaimSpec>;
+
+export const COMPARATIVE: ReadonlySet<string> = new Set([
+  "beats_everywhere",
+  "beats_on_average",
+  "beats_at_end",
+  "gap_widens",
+  "gap_narrows",
+  "converges",
+  "no_worse_than",
+  "within_tolerance",
+]);
+
+export const NEEDS_TOLERANCE: ReadonlySet<string> = new Set(["within_tolerance"]);
+
+/** Plain English for each kind, used in the printed verdict. */
+export const CLAIM_WORDING: Record<(typeof CLAIM_KINDS)[number], string> = {
+  beats_everywhere: "is above {reference} at every x",
+  beats_on_average: "has a higher mean than {reference}",
+  beats_at_end: "is above {reference} at the largest x",
+  gap_widens: "pulls further ahead of {reference} as x grows",
+  gap_narrows: "closes on {reference} as x grows",
+  monotone_increasing: "never decreases as x grows",
+  monotone_decreasing: "never increases as x grows",
+  converges: "settles to within tolerance of {reference}",
+  no_worse_than: "is never more than the tolerance below {reference}",
+  within_tolerance: "stays within tolerance of {reference}",
+};
+
+/**
+ * The Python that tests each claim.
+ *
+ * These run on the summarised frame, so a claim about a mean over seeds is
+ * tested against that mean rather than against the raw draws.
+ */
+export function emitClaimTests(claims: ClaimSpec[], out: string[]): void {
+  if (!claims.length) return;
+
+  out.push(
+    "",
+    "def _aligned(frame, subject, reference):",
+    '    """Both series on the x values they share, in x order."""',
+    "    pivot = frame.pivot_table(index=X_FIELD, columns=GROUP, values=Y_FIELD, aggfunc=\"mean\")",
+    "    if subject not in pivot.columns:",
+    "        return None",
+    "    if reference is not None and reference not in pivot.columns:",
+    "        return None",
+    "    columns = [subject] if reference is None else [subject, reference]",
+    "    pair = pivot[columns].dropna().sort_index()",
+    "    return pair if len(pair) else None",
+    "",
+    "",
+    "def check_claim(frame, claim):",
+    '    """Return (holds, detail). None means the claim could not be tested."""',
+    '    subject, reference = claim["subject"], claim.get("reference")',
+    '    tolerance = claim.get("tolerance") or 0.0',
+    "    pair = _aligned(frame, subject, reference)",
+    "    if pair is None:",
+    '        return None, "the named series are not both in the data"',
+    "",
+    "    mine = pair[subject].to_numpy(dtype=float)",
+    "    theirs = pair[reference].to_numpy(dtype=float) if reference else None",
+    '    kind = claim["kind"]',
+    "",
+    '    if kind == "beats_everywhere":',
+    "        losses = int(np.sum(mine <= theirs))",
+    "        return losses == 0, f\"{losses} of {len(mine)} x values are not above {reference}\"",
+    "",
+    '    if kind == "beats_on_average":',
+    "        gap = float(mine.mean() - theirs.mean())",
+    '        return gap > 0, f"mean difference is {gap:+.4g}"',
+    "",
+    '    if kind == "beats_at_end":',
+    "        gap = float(mine[-1] - theirs[-1])",
+    '        return gap > 0, f"difference at the largest x is {gap:+.4g}"',
+    "",
+    '    if kind in ("gap_widens", "gap_narrows"):',
+    "        gap = mine - theirs",
+    "        half = max(len(gap) // 2, 1)",
+    "        early, late = float(gap[:half].mean()), float(gap[half:].mean())",
+    "        change = late - early",
+    '        widening = kind == "gap_widens"',
+    "        holds = change > 0 if widening else change < 0",
+    '        return holds, f"gap moves from {early:+.4g} to {late:+.4g}, a change of {change:+.4g}"',
+    "",
+    '    if kind in ("monotone_increasing", "monotone_decreasing"):',
+    "        steps = np.diff(mine)",
+    '        rising = kind == "monotone_increasing"',
+    "        breaks = int(np.sum(steps < -tolerance if rising else steps > tolerance))",
+    '        return breaks == 0, f"{breaks} of {len(steps)} steps go the wrong way"',
+    "",
+    '    if kind == "converges":',
+    "        tail = max(len(mine) // 5, 1)",
+    "        spread = float(np.abs(mine - theirs)[-tail:].max())",
+    '        return spread <= tolerance, f"largest gap over the final fifth is {spread:.4g}"',
+    "",
+    '    if kind == "no_worse_than":',
+    "        deficit = float(np.max(theirs - mine))",
+    '        return deficit <= tolerance, f"largest shortfall against {reference} is {deficit:.4g}"',
+    "",
+    '    if kind == "within_tolerance":',
+    "        spread = float(np.max(np.abs(mine - theirs)))",
+    '        return spread <= tolerance, f"largest absolute difference is {spread:.4g}"',
+    "",
+    '    return None, f"no test implemented for {kind}"',
+    "",
+    "",
+    "def verify_claims(frame):",
+    '    """Test every claim. Returns True when none of them failed."""',
+    "    if not CLAIMS:",
+    "        return True",
+    '    print("claims:")',
+    "    ok = True",
+    "    for claim in CLAIMS:",
+    "        holds, detail = check_claim(frame, claim)",
+    '        wording = claim["wording"].replace("{reference}", str(claim.get("reference")))',
+    '        sentence = f"{claim[\'subject\']} {wording}"',
+    "        if holds is None:",
+    '            print(f"  UNTESTED  {sentence} ({detail})")',
+    "            continue",
+    "        if holds:",
+    '            print(f"  HOLDS     {sentence} ({detail})")',
+    "        else:",
+    "            ok = False",
+    '            print(f"  FAILS     {sentence} ({detail})")',
+    '            print(f"            the figure does not support this. Do not write it in the caption.")',
+    "    return ok",
+    "",
+  );
+}

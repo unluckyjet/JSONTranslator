@@ -1,9 +1,17 @@
 import { createHash } from "node:crypto";
 import { hasCategoricalX, type FigureSpec } from "../schema.ts";
+import { emitAltText } from "../alttext.ts";
+import { emitClaimTests, CLAIM_WORDING } from "../claims.ts";
 import { emitAnimation } from "./animate.ts";
 import { emitBootstrap, emitLoad, emitPrepare, emitSmooth, emitSummarise } from "./data.ts";
 import { emitDecoratePanel, emitHelpers, emitLegend } from "./decorate.ts";
 import { emitDraw } from "./draw.ts";
+import {
+  emitAltTextConstants,
+  emitDataFingerprint,
+  emitInteractive,
+  emitLatex,
+} from "./outputs.ts";
 import { pyList, pyOptStr, pyStr } from "./py.ts";
 import {
   BAND_ALPHA,
@@ -54,6 +62,7 @@ function emitPreamble(spec: FigureSpec, out: string[]): void {
     "# The spec is embedded in the exported files' metadata, so a reader can",
     "# recover exactly what produced this figure. DISCLOSURE is ready to paste",
     "# into a methods section.",
+    "import hashlib",
     "import math",
     "",
     "import matplotlib",
@@ -164,6 +173,29 @@ function emitPreamble(spec: FigureSpec, out: string[]): void {
   out.push(`TOOL = "GraphUnslopify ${TOOL_VERSION}"`);
   out.push(`SPEC_HASH = ${pyStr(specHash)}`);
   out.push(`SPEC_JSON = ${pyStr(specJson)}`);
+  const axisLabel = (label: string, unit?: string) => (unit ? `${label} (${unit})` : label);
+  out.push(`X_AXIS_LABEL = ${pyStr(axisLabel(spec.x.label, spec.x.unit))}`);
+  out.push(`Y_AXIS_LABEL = ${pyStr(axisLabel(spec.y.label, spec.y.unit))}`);
+  out.push(`FIGURE_TITLE = ${pyOptStr(spec.title)}`);
+  emitAltTextConstants(spec, out);
+
+  if (spec.claims?.length) {
+    out.push("CLAIMS = [");
+    for (const claim of spec.claims) {
+      out.push(
+        `    {"kind": ${pyStr(claim.kind)}, "subject": ${pyStr(claim.subject)}, ` +
+          `"reference": ${pyOptStr(claim.reference)}, ` +
+          `"tolerance": ${claim.tolerance === undefined ? "None" : claim.tolerance}, ` +
+          `"wording": ${pyStr(CLAIM_WORDING[claim.kind])}},`,
+      );
+    }
+    out.push("]");
+  } else {
+    out.push("CLAIMS = []");
+  }
+
+  out.push("DATA_HASH = \"unknown\"");
+  out.push("ALT_TEXT = \"\"");
   out.push(
     "DISCLOSURE = (",
     '    f"This figure was produced by {TOOL} from a declarative figure "',
@@ -195,11 +227,12 @@ function emitMain(spec: FigureSpec, out: string[]): void {
     "",
     "def metadata_for(fmt):",
     "    # Embedding the spec means a reviewer can recover what produced the figure.",
+    "    stamp = f\"{TOOL} spec:{SPEC_HASH} data:{DATA_HASH}\"",
     '    if fmt == "png":',
-    '        return {"Software": TOOL, "Description": SPEC_JSON}',
+    '        return {"Software": stamp, "Description": SPEC_JSON, "Comment": ALT_TEXT}',
     '    if fmt == "svg":',
-    '        return {"Creator": TOOL, "Description": SPEC_JSON}',
-    '    return {"Creator": TOOL, "Subject": SPEC_JSON}',
+    '        return {"Creator": stamp, "Description": ALT_TEXT, "Title": SPEC_HASH}',
+    '    return {"Creator": stamp, "Subject": SPEC_JSON, "Keywords": SPEC_HASH}',
     "",
     "",
     "def check(fig):",
@@ -232,6 +265,8 @@ function emitMain(spec: FigureSpec, out: string[]): void {
     "",
     "",
     "def main():",
+    "    global DATA_HASH, ALT_TEXT",
+    "    DATA_HASH = data_fingerprint()",
     "    df = prepare(load())",
   );
   if (warnsDuplicates) out.push("    warn_duplicates(df)");
@@ -292,12 +327,19 @@ function emitMain(spec: FigureSpec, out: string[]): void {
   }
   out.push(
     "        check(fig)",
+    "        summary = summarise(df) if GROUP is not None else df",
+    "        claims_hold = verify_claims(summary)",
+    "        for claim in CLAIMS:",
+    '            verdict, _ = check_claim(summary, claim)',
+    '            claim["_verdict"] = verdict',
+    "        description = alt_text(summary)",
+    "        if AUTHOR_CONTEXT:",
+    '            description = f"{description} {AUTHOR_CONTEXT}"',
+    '        print(f"alt text: {description}")',
     "        for fmt in FORMATS:",
     '            path = f"{STEM}.{fmt}"',
-    '            kwargs = {"bbox_inches": "tight", "metadata": metadata_for(fmt)}',
-    '            if fmt == "png":',
-    '                kwargs["dpi"] = DPI',
-    "            fig.savefig(path, **kwargs)",
+    "            meta = metadata_for(fmt)",
+    "            fig.savefig(path, bbox_inches=\"tight\", metadata=meta, **({\"dpi\": DPI} if fmt == \"png\" else {}))",
     '            print(f"wrote {path}")',
   );
   if (spec.animate) {
@@ -310,7 +352,14 @@ function emitMain(spec: FigureSpec, out: string[]): void {
   }
   out.push(
     "    plt.close(fig)",
+    spec.output.latex ? "    write_latex(description)" : "    # no latex output requested",
+    spec.output.interactive
+      ? "    write_interactive(df)"
+      : "    # no interactive output requested",
     "    print(DISCLOSURE)",
+    '    print(f"data sha256:{DATA_HASH}")',
+    "    if not claims_hold:",
+    '        print("at least one claim failed. The caption must not assert it.")',
     "",
     "",
     'if __name__ == "__main__":',
@@ -330,6 +379,11 @@ export function emitPython(spec: FigureSpec): string {
   emitDraw(spec, out);
   emitDecoratePanel(spec, out);
   emitLegend(spec, out);
+  emitDataFingerprint(out);
+  emitClaimTests(spec.claims ?? [], out);
+  emitAltText(spec, out);
+  emitLatex(spec, out);
+  emitInteractive(spec, out);
   emitAnimation(spec, out);
   emitMain(spec, out);
 

@@ -1,3 +1,5 @@
+import { COMPARATIVE, NEEDS_TOLERANCE } from "./claims.ts";
+import { encodingSuggestions } from "./perception.ts";
 import { hasCategoricalX, type FigureSpec } from "./schema.ts";
 
 /**
@@ -15,6 +17,12 @@ export type Finding = {
   severity: Severity;
   code: string;
   message: string;
+  /**
+   * A partial spec to merge in, so an agent can apply the fix rather than
+   * re-derive it. The agent literature reports models recognising an error and
+   * failing to act on it, which is a solvable interface problem.
+   */
+  fix?: Record<string, unknown>;
 };
 
 const MAX_LEGIBLE_SERIES = 8;
@@ -66,8 +74,8 @@ function nearest(field: string, columns: string[]): string | undefined {
 
 export function verify(spec: FigureSpec): Finding[] {
   const findings: Finding[] = [];
-  const add = (severity: Severity, code: string, message: string) =>
-    findings.push({ severity, code, message });
+  const add = (severity: Severity, code: string, message: string, fix?: Record<string, unknown>) =>
+    findings.push(fix ? { severity, code, message, fix } : { severity, code, message });
 
   for (const [name, axis] of [
     ["x", spec.x],
@@ -424,6 +432,62 @@ export function verify(spec: FigureSpec): Finding[] {
     if (spec.animate.style === "grow" && spec.kind !== "bar") {
       add("warning", "grow_outside_bars", 'The "grow" style raises bars. Use "draw" or "reveal" here.');
     }
+  }
+
+  // --- claims --------------------------------------------------------------
+
+  for (const claim of spec.claims ?? []) {
+    if (!spec.group) {
+      add(
+        "error",
+        "claim_without_group",
+        `The claim about "${claim.subject}" needs a group column, because it names a series.`,
+      );
+      break;
+    }
+    if (COMPARATIVE.has(claim.kind) && !claim.reference) {
+      add(
+        "error",
+        "claim_without_reference",
+        `A ${claim.kind} claim compares two series, so it needs claim.reference.`,
+      );
+    }
+    if (NEEDS_TOLERANCE.has(claim.kind) && claim.tolerance === undefined) {
+      add(
+        "error",
+        "claim_without_tolerance",
+        `A ${claim.kind} claim has to say how close counts, so set claim.tolerance.`,
+      );
+    }
+    if (claim.subject === claim.reference) {
+      add("error", "claim_compares_a_series_to_itself", `"${claim.subject}" cannot beat itself.`);
+    }
+    for (const [role, name] of [
+      ["subject", claim.subject],
+      ["reference", claim.reference],
+    ] as const) {
+      if (name && spec.series_order && !spec.series_order.includes(name)) {
+        add(
+          "error",
+          "claim_series_unknown",
+          `claim.${role} is "${name}", which does not appear in series_order.`,
+        );
+      }
+    }
+  }
+
+  if (spec.claims?.length && spec.kind === "heatmap") {
+    add(
+      "error",
+      "claims_need_series",
+      "Claims compare series against each other, which a heatmap does not have.",
+    );
+  }
+
+  // --- encoding choice, ranked rather than forbidden ------------------------
+
+  for (const suggestion of encodingSuggestions(spec)) {
+    add("warning", suggestion.code, suggestion.message, suggestion.patch);
   }
 
   return findings;
