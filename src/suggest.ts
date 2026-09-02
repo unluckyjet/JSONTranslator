@@ -80,13 +80,17 @@ export function suggestFigures(profile: Profile, limit = 3): Candidate[] {
   const repeats = profile.repeats ?? [];
   const candidates: { spec: Record<string, unknown>; why: string }[] = [];
 
-  const group = categories[0]?.name;
-  const replicate = ordinals.length > 1 ? ordinals[ordinals.length - 1]!.name : undefined;
+  const [longestOrdinal] = ordinals;
+  const [measure, secondMeasure] = measures;
+  const [category, secondCategory] = categories;
+
+  const group = category?.name;
+  const replicate = ordinals.length > 1 ? ordinals.at(-1)?.name : undefined;
 
   // A curve along the longest ordinal, which is what a training run looks like.
-  if (ordinals.length && measures.length) {
-    const x = ordinals[0]!.name;
-    const y = measures[0]!.name;
+  if (longestOrdinal && measure) {
+    const x = longestOrdinal.name;
+    const y = measure.name;
     const repeated = repeats.some((r) => r.x === x && r.group === group);
     const spec: Record<string, unknown> = {
       kind: "line",
@@ -107,10 +111,10 @@ export function suggestFigures(profile: Profile, limit = 3): Candidate[] {
   }
 
   // One bar per category, which is the comparison a table would otherwise make.
-  if (categories.length && measures.length) {
-    const x = categories[0]!.name;
-    const y = measures[0]!.name;
-    const second = categories[1]?.name;
+  if (category && measure) {
+    const x = category.name;
+    const y = measure.name;
+    const second = secondCategory?.name;
     candidates.push({
       spec: {
         kind: "bar",
@@ -126,46 +130,46 @@ export function suggestFigures(profile: Profile, limit = 3): Candidate[] {
   }
 
   // Two measures against each other, which is where a trade-off lives.
-  if (measures.length >= 2) {
+  if (measure && secondMeasure) {
     candidates.push({
       spec: {
         kind: "scatter",
-        x: axis(measures[0]!.name),
-        y: axis(measures[1]!.name),
+        x: axis(measure.name),
+        y: axis(secondMeasure.name),
         ...(group ? { group } : {}),
         frontier: { x: "min", y: "max" },
       },
-      why: `${measures[0]!.name} and ${measures[1]!.name} are both measured, so this shows the trade-off`,
+      why: `${measure.name} and ${secondMeasure.name} are both measured, so this shows the trade-off`,
     });
   }
 
   // The distribution behind a summary, which a bar chart hides.
-  if (categories.length && measures.length) {
+  if (category && measure) {
     candidates.push({
       spec: {
         kind: "box",
-        x: axis(categories[0]!.name),
-        y: axis(measures[0]!.name),
+        x: axis(category.name),
+        y: axis(measure.name),
         show_points: true,
       },
-      why: `shows the spread within each ${categories[0]!.name} rather than only its average`,
+      why: `shows the spread within each ${category.name} rather than only its average`,
     });
   }
 
   // A grid, when two low-cardinality keys index one measure.
-  const gridKeys = [...ordinals, ...categories].filter((c) => c.distinct <= 12);
-  if (gridKeys.length >= 2 && measures.length) {
+  const [gridX, gridY] = [...ordinals, ...categories].filter((c) => c.distinct <= 12);
+  if (gridX && gridY && measure) {
     candidates.push({
       spec: {
         kind: "heatmap",
-        x: axis(gridKeys[0]!.name),
-        y: axis(gridKeys[1]!.name),
-        value: measures[0]!.name,
-        value_label: titleCase(measures[0]!.name),
+        x: axis(gridX.name),
+        y: axis(gridY.name),
+        value: measure.name,
+        value_label: titleCase(measure.name),
         aggregation: "mean",
         annotate_cells: true,
       },
-      why: `${gridKeys[0]!.name} and ${gridKeys[1]!.name} form a small grid over ${measures[0]!.name}`,
+      why: `${gridX.name} and ${gridY.name} form a small grid over ${measure.name}`,
     });
   }
 
