@@ -78,6 +78,10 @@ export function primaryChannel(spec: FigureSpec): Channel {
       return "position_common";
     case "heatmap":
       return "shading";
+    case "table":
+      // A printed number is exact rather than estimated, so it sits above every
+      // graphical channel for reading one value.
+      return "position_common";
   }
 }
 

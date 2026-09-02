@@ -123,4 +123,4 @@ export const READERS = {
   json: "read_json",
 } as const;
 
-export const TOOL_VERSION = "0.5.0";
+export const TOOL_VERSION = "0.6.0";

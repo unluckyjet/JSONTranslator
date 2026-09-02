@@ -1,6 +1,6 @@
 {
   "name": "graph-unslopify",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "MCP server that turns a semantic figure spec into runnable matplotlib code.",
   "scripts": {
     "test": "node --test \"test/**/*.test.ts\"",
@@ -12,7 +12,8 @@
     "baseline": "node scripts/baseline.ts",
     "example-data": "node scripts/make-example-data.ts",
     "test:python": "python -m pytest python/tests -q",
-    "recipe-check": "node scripts/recipe-check.ts"
+    "recipe-check": "node scripts/recipe-check.ts",
+    "compose-check": "node scripts/compose-check.ts"
   },
   "type": "module",
   "dependencies": {

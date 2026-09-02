@@ -26,6 +26,7 @@ const KIND_PHRASING: Record<FigureSpec["kind"], string> = {
   box: "Box plot",
   violin: "Violin plot",
   heatmap: "Heatmap",
+  table: "Table",
 };
 
 function axisPhrase(label: string, unit?: string): string {
@@ -37,7 +38,11 @@ export function encodingSentence(spec: FigureSpec): string {
   const kind = KIND_PHRASING[spec.kind];
   const parts: string[] = [];
 
-  if (spec.kind === "heatmap") {
+  if (spec.kind === "table") {
+    parts.push(
+      `${kind} of ${axisPhrase(spec.y.label, spec.y.unit)}, one row per ${spec.x.label.toLowerCase()}`,
+    );
+  } else if (spec.kind === "heatmap") {
     parts.push(
       `${kind} of ${spec.value_label.toLowerCase()}, with ${axisPhrase(spec.x.label, spec.x.unit)} ` +
         `across the horizontal axis and ${axisPhrase(spec.y.label, spec.y.unit)} down the vertical axis`,

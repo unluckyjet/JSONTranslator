@@ -5,6 +5,13 @@ import { emitClaimTests, CLAIM_WORDING } from "../claims.ts";
 import { emitAnimation } from "./animate.ts";
 import { emitBootstrap, emitLoad, emitPrepare, emitSmooth, emitSummarise } from "./data.ts";
 import { emitDecoratePanel, emitHelpers, emitLegend } from "./decorate.ts";
+import {
+  emitAxisBreak,
+  emitInset,
+  emitLayers,
+  emitRepeat,
+  emitTable,
+} from "./compose.ts";
 import { emitDraw } from "./draw.ts";
 import {
   emitAltTextConstants,
@@ -114,6 +121,15 @@ function emitPreamble(spec: FigureSpec, out: string[]): void {
   out.push(`EMPHASIS = ${pyOptStr(spec.emphasis?.series)}`);
   out.push(`SERIES_COUNT = ${spec.series_order ? spec.series_order.length : 1}`);
   out.push(`PALETTE_LOCK = ${pyOptStr(spec.palette_lock)}`);
+  if (spec.layers?.length) out.push('LAYER_COLOURS = ["#767676", "#404040", "#a0a0a0"]');
+  if (spec.repeat) {
+    out.push(`REPEAT_FIELDS = ${pyList(spec.repeat.fields)}`);
+    out.push(`REPEAT_COLUMNS = ${spec.repeat.columns}`);
+  }
+  if (spec.kind === "table") {
+    out.push(`HIGHLIGHT = ${pyStr(spec.highlight)}`);
+    out.push(`HIGHER_IS_BETTER = ${spec.higher_is_better ? "True" : "False"}`);
+  }
   out.push("LOCKED = None");
   if (hasCategoricalX(spec)) {
     const order = "category_order" in spec ? spec.category_order : undefined;
@@ -271,17 +287,57 @@ function emitMain(spec: FigureSpec, out: string[]): void {
     "    DATA_HASH = data_fingerprint()",
     "    df = prepare(load())",
   );
+
+  if (spec.kind === "table") {
+    out.push(
+      "    table = build_table(df)",
+      "    markdown, winners = write_table(table)",
+      "    render_table_image(table, winners)",
+      "    ALT_TEXT = ENCODING_SENTENCE",
+      "    print(DISCLOSURE)",
+      '    print(f"data sha256:{DATA_HASH}")',
+      "",
+      "",
+      'if __name__ == "__main__":',
+      "    main()",
+    );
+    return;
+  }
   if (warnsDuplicates) out.push("    warn_duplicates(df)");
   out.push(
     "    if PALETTE_LOCK is not None and GROUP is not None:",
     "        globals()[\"LOCKED\"] = locked_appearance(",
     "            SERIES_ORDER if SERIES_ORDER is not None else sorted(df[GROUP].dropna().unique(), key=str)",
     "        )",
-    "    blocks = panels(df)",
-    "    columns = min(FACET_COLUMNS, len(blocks)) if len(blocks) > 1 else 1",
+    spec.repeat ? "    blocks = repeated_panels(df)" : "    blocks = panels(df)",
+    spec.repeat
+      ? "    columns = min(REPEAT_COLUMNS, len(blocks))"
+      : "    columns = min(FACET_COLUMNS, len(blocks)) if len(blocks) > 1 else 1",
     "    rows = math.ceil(len(blocks) / columns)",
     "",
     "    with plt.rc_context(RC_PARAMS):",
+  );
+
+  if (spec.axis_break) {
+    // A cut axis is two stacked axes, so it cannot go through the panel loop.
+    out.push(
+      "        fig = plt.figure(figsize=(FIGSIZE[0], FIGSIZE[1] * 1.25))",
+      "        upper, lower = draw_with_break(fig, df)",
+      "        flat = [lower]",
+      "        blocks = [(None, df)]",
+      "        decorate_panel(lower, df, None, True, True)",
+      "        decorate_panel(upper, df, None, False, True)",
+      "        upper.set_ylabel(None)",
+      "        add_legend(fig, upper, df)",
+      "        legend = lower.get_legend()",
+      "        if legend is not None:",
+      "            legend.remove()",
+    );
+    emitSaveBlock(spec, out);
+    return;
+  }
+
+  out.push(
     "        fig, axes = plt.subplots(",
     "            rows,",
     "            columns,",
@@ -293,10 +349,16 @@ function emitMain(spec: FigureSpec, out: string[]): void {
     "        flat = list(axes.flat)",
     "        for index, (name, block) in enumerate(blocks):",
     "            ax = flat[index]",
+    spec.repeat
+      ? '            globals()["Y_FIELD"] = name'
+      : "            # one panel per facet value",
     "            draw_panel(ax, block)",
+    spec.layers?.length ? "            draw_layers(ax, block)" : "            # no extra layers",
+    spec.inset ? "            add_inset(ax, block)" : "            # no inset requested",
     letters
       ? '            letter = f"({chr(ord(chr(97)) + index)}) {name}" if name is not None else None'
       : "            letter = str(name) if name is not None else None",
+    spec.repeat ? "            ax.set_ylabel(str(name))" : "            # y label comes from the spec",
     "            show_x = (index // columns) == rows - 1 or not SHARE_X",
     "            show_y = (index % columns) == 0 or not SHARE_Y",
     "            decorate_panel(ax, block, letter, show_x, show_y)",
@@ -331,6 +393,10 @@ function emitMain(spec: FigureSpec, out: string[]): void {
   if (spec.kind === "line" && spec.y2) {
     out.push('        print(f"dual axis in use. Justification: {Y2_JUSTIFICATION}")');
   }
+  emitSaveBlock(spec, out);
+}
+
+function emitSaveBlock(spec: FigureSpec, out: string[]): void {
   out.push(
     "        check(fig)",
     "        summary = summarise(df) if GROUP is not None else df",
@@ -382,7 +448,15 @@ export function emitPython(spec: FigureSpec): string {
   emitSummarise(spec, out);
   emitSmooth(spec, out);
   emitHelpers(spec, out);
-  emitDraw(spec, out);
+  if (spec.kind === "table") {
+    emitTable(spec, out);
+  } else {
+    emitDraw(spec, out);
+    emitLayers(spec, out);
+    emitInset(spec, out);
+    emitAxisBreak(spec, out);
+    emitRepeat(spec, out);
+  }
   emitDecoratePanel(spec, out);
   emitLegend(spec, out);
   emitDataFingerprint(out);

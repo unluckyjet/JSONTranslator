@@ -167,6 +167,11 @@ export const AnnotationSpec = z.object({
 
 export const FacetSpec = z.object({
   by: z.string().min(1).describe("Column that splits the figure into panels."),
+  rows: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("A second column, giving a grid of panels with by across and rows down."),
   columns: z.number().int().min(1).max(6).default(2),
   share_x: z.boolean().default(true),
   share_y: z.boolean().default(true),
@@ -210,6 +215,55 @@ export const AnimateSpec = z.object({
   stagger_s: z.number().min(0).max(5).default(0.35).describe("Delay between series entering."),
   hold_s: z.number().min(0).max(10).default(1.2).describe("Still time on the finished figure."),
   format: z.enum(["mp4", "gif"]).default("mp4"),
+});
+
+/**
+ * An extra mark drawn over the same axes.
+ *
+ * Vega-Lite's layer operator composes recursively. This is the constrained
+ * version: one list of extra marks over the figure's own x, which covers the
+ * cases that actually recur, observed points over a fitted line, a rug under a
+ * distribution, a threshold rule. Recursive composition is not here.
+ */
+export const LayerSpec = z.object({
+  mark: z
+    .enum(["line", "scatter", "rug", "band", "rule"])
+    .describe("rug draws ticks along the axis, band fills between two columns, rule is a line at a value."),
+  y: z.string().min(1).optional().describe("Column for this layer. Defaults to the figure's y field."),
+  y2: z.string().min(1).optional().describe("Upper column, for a band."),
+  value: z.number().optional().describe("Where a rule sits."),
+  label: z.string().min(1).optional().describe("Legend entry. Omit to keep it out of the legend."),
+  filter: z.array(FilterSpec).min(1).optional().describe("Rows this layer draws, if not all of them."),
+  recede: z.boolean().default(true).describe("Draw behind the figure's own marks."),
+});
+
+/** Small multiples over columns rather than over a data column. */
+export const RepeatSpec = z.object({
+  fields: z.array(z.string().min(1)).min(2).describe("One panel per column named here."),
+  columns: z.number().int().min(1).max(6).default(2),
+  share_x: z.boolean().default(true),
+  share_y: z.boolean().default(false).describe("Off by default, since repeated metrics rarely share a range."),
+});
+
+/**
+ * A gap cut out of an axis, for data with an empty middle.
+ *
+ * The honest alternative to a log scale when the range is bimodal rather than
+ * exponential. The break is drawn explicitly with slanted marks so a reader
+ * cannot mistake it for a continuous axis.
+ */
+export const BreakSpec = z.object({
+  axis: z.enum(["x", "y"]).default("y"),
+  from: z.number().describe("Where the gap starts."),
+  to: z.number().describe("Where the gap resumes."),
+});
+
+/** A zoomed copy of one region, drawn inside the axes with its source marked. */
+export const InsetSpec = z.object({
+  x: z.tuple([z.number(), z.number()]).describe("The x range to magnify."),
+  y: z.tuple([z.number(), z.number()]).describe("The y range to magnify."),
+  corner: z.enum(["upper_left", "upper_right", "lower_left", "lower_right"]).default("lower_right"),
+  size: z.number().min(0.15).max(0.6).default(0.35).describe("Fraction of the axes the inset covers."),
 });
 
 export const SeriesFromColumnsSpec = z.object({
@@ -263,6 +317,10 @@ const base = {
         "model. Levels one to three are generated. Leave this out rather than guessing.",
     ),
   caption: z.string().min(10).optional().describe("The caption, used by the LaTeX output."),
+  layers: z.array(LayerSpec).min(1).optional().describe("Extra marks over the same axes."),
+  repeat: RepeatSpec.optional(),
+  axis_break: BreakSpec.optional(),
+  inset: InsetSpec.optional(),
   palette_lock: z
     .string()
     .min(1)
@@ -348,6 +406,29 @@ export const HeatmapSpec = z.object({
     .describe("Centre the colour scale on zero. For differences, not magnitudes."),
 });
 
+/**
+ * A table, because sometimes six numbers should not be a chart.
+ *
+ * Position is the most accurately read channel and a printed number is exact,
+ * so a small comparison across a handful of categories is better served by a
+ * table than by bars. This emits markdown, LaTeX and a rendered image, so the
+ * same spec can go into a paper or a readme.
+ */
+export const TableSpec = z.object({
+  ...base,
+  kind: z.literal("table"),
+  x: AxisSpec.describe("The row key."),
+  y: AxisSpec.describe("The value shown in each cell."),
+  aggregation: z.enum(["none", "mean", "median", "sum", "count"]).default("mean"),
+  precision: z.number().int().min(0).max(6).default(2),
+  highlight: z
+    .enum(["none", "best_per_row", "best_per_column"])
+    .default("none")
+    .describe("Bold the winning cell, which is what a results table is read for."),
+  higher_is_better: z.boolean().default(true),
+  uncertainty: UncertaintySpec.optional(),
+});
+
 export const FigureSpec = z.discriminatedUnion("kind", [
   LineSpec,
   ScatterSpec,
@@ -355,11 +436,20 @@ export const FigureSpec = z.discriminatedUnion("kind", [
   BoxSpec,
   ViolinSpec,
   HeatmapSpec,
+  TableSpec,
 ]);
 export type FigureSpec = z.infer<typeof FigureSpec>;
 export type FigureKind = FigureSpec["kind"];
 
-export const FIGURE_KINDS = ["line", "scatter", "bar", "box", "violin", "heatmap"] as const;
+export const FIGURE_KINDS = [
+  "line",
+  "scatter",
+  "bar",
+  "box",
+  "violin",
+  "heatmap",
+  "table",
+] as const;
 
 /** Kinds whose x is a category on an index rather than a number. */
 export function hasCategoricalX(spec: FigureSpec): boolean {
@@ -368,5 +458,10 @@ export function hasCategoricalX(spec: FigureSpec): boolean {
 
 /** Kinds that draw one mark per series rather than a distribution. */
 export function usesSeriesColours(spec: FigureSpec): boolean {
-  return spec.kind !== "heatmap";
+  return spec.kind !== "heatmap" && spec.kind !== "table";
+}
+
+/** Kinds that draw marks on axes, as opposed to laying out text. */
+export function isPlotted(spec: FigureSpec): boolean {
+  return spec.kind !== "table";
 }
