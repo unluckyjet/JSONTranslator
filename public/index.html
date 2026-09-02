@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GraphUnslopify</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0 auto;
+        padding: 3rem 1.25rem;
+        max-width: 44rem;
+        font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+      pre { padding: 0.9rem; border-radius: 6px; overflow-x: auto; background: rgba(127,127,127,0.12); }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { text-align: left; padding: 0.4rem 0.7rem 0.4rem 0; border-bottom: 1px solid rgba(127,127,127,0.3); }
+      .note { padding: 0.8rem 1rem; border-left: 3px solid #d08700; background: rgba(208,135,0,0.1); }
+    </style>
+  </head>
+  <body>
+    <h1>GraphUnslopify</h1>
+    <p>An MCP server and HTTP API that will translate JSON plot specifications into matplotlib code.</p>
+
+    <p class="note">
+      <strong>MVP.</strong> The transport and tool registration work. The translation does not exist
+      yet. Sending JSON returns <code>json successfully passed</code> and a description of what arrived.
+    </p>
+
+    <h2>Endpoints</h2>
+    <table>
+      <tr><th>Path</th><th>Method</th><th>Purpose</th></tr>
+      <tr><td><code>/api/mcp</code></td><td>GET, POST, DELETE</td><td>MCP Streamable HTTP</td></tr>
+      <tr><td><code>/api/convert</code></td><td>POST</td><td>Plain HTTP twin of the tool</td></tr>
+      <tr><td><code><a href="/api/health">/api/health</a></code></td><td>GET</td><td>Liveness</td></tr>
+    </table>
+
+    <h2>Connect an MCP client</h2>
+    <pre><code>claude mcp add --transport http graph-unslopify \
+  https://&lt;this-host&gt;/api/mcp</code></pre>
+
+    <h2>Or just curl it</h2>
+    <pre><code>curl -X POST https://&lt;this-host&gt;/api/convert \
+  -H 'content-type: application/json' \
+  -d '{"kind":"line","x":[1,2,3],"y":[4,5,6]}'</code></pre>
+
+    <p><a href="https://github.com/unluckyjet/JSONTranslator">Source on GitHub</a></p>
+  </body>
+</html>
