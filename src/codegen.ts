@@ -94,10 +94,20 @@ function axisLabel(axis: AxisSpec): string {
   return axis.unit ? `${axis.label} (${axis.unit})` : axis.label;
 }
 
-/** Bar categories sit on an index, so scale and limits mean nothing there. */
-function isCategorical(spec: FigureSpec, which: "x" | "y"): boolean {
-  if (spec.kind !== "bar") return false;
-  return spec.orientation === "vertical" ? which === "x" : which === "y";
+/**
+ * A horizontal bar chart draws the category field up the vertical axis, so the
+ * spec's x and y land on the opposite matplotlib axes from the ones they name.
+ */
+function plotAxis(spec: FigureSpec, specAxis: "x" | "y"): "x" | "y" {
+  if (spec.kind === "bar" && spec.orientation === "horizontal") {
+    return specAxis === "x" ? "y" : "x";
+  }
+  return specAxis;
+}
+
+/** For a bar chart the spec's x is a category on an index, whatever the orientation. */
+function isCategorical(spec: FigureSpec, specAxis: "x" | "y"): boolean {
+  return spec.kind === "bar" && specAxis === "x";
 }
 
 function emitHeader(spec: FigureSpec, out: string[]): void {
@@ -166,6 +176,32 @@ function emitLoad(spec: FigureSpec, out: string[]): void {
   out.push("", "def load():", `    return pd.${READERS[spec.data.format]}(DATA_PATH)`, "");
 }
 
+/** Collapsing repeats needs the data, so this check runs where the data is. */
+function emitDuplicateWarning(spec: FigureSpec, out: string[]): void {
+  out.push(
+    "",
+    "def warn_duplicates(df):",
+    `    keys = [X_FIELD${spec.group ? ", GROUP" : ""}]`,
+    "    if df.duplicated(subset=keys).any():",
+    '        print("warning: repeated x values per series are drawn on top of each other.")',
+    '        print("         set aggregation to mean or median to summarise them.")',
+    "",
+  );
+}
+
+function emitAggregate(aggregation: string, spec: FigureSpec, out: string[]): void {
+  out.push("", "def aggregate(df):");
+  if (aggregation === "none") {
+    out.push("    return df");
+  } else {
+    out.push(
+      `    keys = [X_FIELD${spec.group ? ", GROUP" : ""}]`,
+      `    return df.groupby(keys, as_index=False)[Y_FIELD].${aggregation}()`,
+    );
+  }
+  out.push("");
+}
+
 function emitTrendline(out: string[]): void {
   out.push(
     "",
@@ -184,7 +220,7 @@ function emitTrendline(out: string[]): void {
 
 function emitLineDraw(spec: FigureSpec & { kind: "line" }, out: string[]): void {
   const preset = PRESETS[spec.style.preset];
-  out.push("", "def draw(ax, df):");
+  out.push("", "def draw(ax, df):", "    df = aggregate(df)");
   if (spec.group) {
     out.push(
       "    names = series_names(df)",
@@ -255,16 +291,7 @@ function emitBarDraw(spec: FigureSpec & { kind: "bar" }, out: string[]): void {
   const plot = vertical ? "bar" : "barh";
   const tickAxis = vertical ? "x" : "y";
 
-  out.push("", "def aggregate(df):");
-  if (spec.aggregation === "none") {
-    out.push("    return df");
-  } else {
-    out.push(
-      `    keys = [X_FIELD${spec.group ? ", GROUP" : ""}]`,
-      `    return df.groupby(keys, as_index=False)[Y_FIELD].${spec.aggregation}()`,
-    );
-  }
-  out.push("", "", "def draw(ax, df):", "    frame = aggregate(df)");
+  out.push("", "def draw(ax, df):", "    frame = aggregate(df)");
   out.push(
     "    categories = list(dict.fromkeys(frame[X_FIELD].tolist()))",
     "    positions = np.arange(len(categories))",
@@ -301,33 +328,28 @@ function emitBarDraw(spec: FigureSpec & { kind: "bar" }, out: string[]): void {
   );
 }
 
-function emitAxis(spec: FigureSpec, which: "x" | "y", axis: AxisSpec, out: string[]): void {
-  out.push(`    ax.set_${which}label(${pyStr(axisLabel(axis))})`);
-  if (isCategorical(spec, which)) return;
-  if (axis.scale !== "linear") out.push(`    ax.set_${which}scale(${pyStr(axis.scale)})`);
-}
-
 function emitFinish(spec: FigureSpec, out: string[]): void {
   out.push("", "def finish(fig, ax):");
-  emitAxis(spec, "x", spec.x, out);
-  emitAxis(spec, "y", spec.y, out);
 
-  if (spec.kind === "bar" && spec.baseline_zero) {
-    const valueAxis = spec.orientation === "vertical" ? spec.y : spec.x;
-    if (valueAxis.scale !== "log") {
-      out.push(
-        spec.orientation === "vertical" ? "    ax.set_ylim(bottom=0)" : "    ax.set_xlim(left=0)",
-      );
-    }
+  for (const specAxis of ["x", "y"] as const) {
+    const axis = spec[specAxis];
+    const target = plotAxis(spec, specAxis);
+    out.push(`    ax.set_${target}label(${pyStr(axisLabel(axis))})`);
+    if (isCategorical(spec, specAxis)) continue;
+    if (axis.scale !== "linear") out.push(`    ax.set_${target}scale(${pyStr(axis.scale)})`);
   }
 
-  for (const [which, axis] of [
-    ["x", spec.x],
-    ["y", spec.y],
-  ] as const) {
-    if (axis.limits && !isCategorical(spec, which)) {
-      out.push(`    ax.set_${which}lim(${axis.limits[0]}, ${axis.limits[1]})`);
-    }
+  if (spec.kind === "bar" && spec.baseline_zero && spec.y.scale !== "log") {
+    out.push(
+      plotAxis(spec, "y") === "y" ? "    ax.set_ylim(bottom=0)" : "    ax.set_xlim(left=0)",
+    );
+  }
+
+  for (const specAxis of ["x", "y"] as const) {
+    const axis = spec[specAxis];
+    if (!axis.limits || isCategorical(spec, specAxis)) continue;
+    const target = plotAxis(spec, specAxis);
+    out.push(`    ax.set_${target}lim(${axis.limits[0]}, ${axis.limits[1]})`);
   }
 
   if (spec.title) out.push(`    ax.set_title(${pyStr(spec.title)})`);
@@ -360,11 +382,11 @@ function emitFinish(spec: FigureSpec, out: string[]): void {
   out.push("");
 }
 
-function emitMain(out: string[]): void {
+function emitMain(spec: FigureSpec, out: string[]): void {
+  const warns = spec.kind !== "scatter" && spec.aggregation === "none";
+  out.push("", "def main():", "    df = load()");
+  if (warns) out.push("    warn_duplicates(df)");
   out.push(
-    "",
-    "def main():",
-    "    df = load()",
     "    with plt.rc_context(RC_PARAMS):",
     "        fig, ax = plt.subplots(figsize=FIGSIZE)",
     "        draw(ax, df)",
@@ -389,6 +411,13 @@ export function emitPython(spec: FigureSpec): string {
   emitHeader(spec, out);
   emitLoad(spec, out);
   emitSeriesHelpers(spec, out);
+
+  const aggregation = spec.kind === "scatter" ? "none" : spec.aggregation;
+  if (spec.kind !== "scatter") {
+    emitAggregate(aggregation, spec, out);
+    if (aggregation === "none") emitDuplicateWarning(spec, out);
+  }
+
   if (spec.kind === "scatter" && spec.trendline === "linear") emitTrendline(out);
 
   if (spec.kind === "line") emitLineDraw(spec, out);
@@ -396,7 +425,7 @@ export function emitPython(spec: FigureSpec): string {
   else emitBarDraw(spec, out);
 
   emitFinish(spec, out);
-  emitMain(out);
+  emitMain(spec, out);
 
   return out.join("\n").replace(/\n{3,}/g, "\n\n\n") + "\n";
 }

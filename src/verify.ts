@@ -112,8 +112,8 @@ export function verify(spec: FigureSpec): Finding[] {
         "aggregation is \"none\", so repeated x values will draw overlapping bars instead of a summary. Set mean or median if the data has repeats.",
       );
     }
-    const valueAxis = spec.orientation === "vertical" ? spec.y : spec.x;
-    if (spec.baseline_zero && valueAxis.scale === "log") {
+    // The y field always carries the measured value; orientation only moves it.
+    if (spec.baseline_zero && spec.y.scale === "log") {
       add(
         "error",
         "log_bar_baseline",

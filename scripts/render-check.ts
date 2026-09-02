@@ -26,6 +26,8 @@ const base = {
 
 const CASES: [string, Record<string, unknown>][] = [
   ["line_grouped", { ...base, kind: "line" }],
+  ["line_mean_over_seeds", { ...base, kind: "line", aggregation: "mean" }],
+  ["line_median_over_seeds", { ...base, kind: "line", aggregation: "median" }],
   ["line_plain", { ...base, kind: "line", group: undefined, marker: true }],
   ["line_outside_legend", { ...base, kind: "line", legend: { position: "outside_right" } }],
   ["line_emphasis", { ...base, kind: "line", series_order: ["baseline", "ours"], emphasis: { series: "ours" } }],

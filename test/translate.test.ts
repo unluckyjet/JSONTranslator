@@ -108,6 +108,18 @@ test("errors set ok false but still return a script", () => {
   assert.ok(result.code.length > 0);
 });
 
+test("an unaggregated line chart carries a runtime duplicate check", () => {
+  const result = translated(line);
+  assert.match(result.code, /def warn_duplicates/);
+  assert.match(result.code, /warn_duplicates\(df\)/);
+});
+
+test("an aggregated line chart groups instead of warning", () => {
+  const result = translated({ ...line, aggregation: "mean" });
+  assert.ok(!result.code.includes("warn_duplicates"));
+  assert.match(result.code, /groupby\(keys, as_index=False\)\[Y_FIELD\]\.mean\(\)/);
+});
+
 test("output is deterministic", () => {
   assert.equal(translated(line).code, translated(line).code);
 });
@@ -129,6 +141,38 @@ test("a categorical bar axis gets no scale or limit calls", () => {
   assert.ok(!result.code.includes("set_xscale"));
   assert.ok(!result.code.includes("set_xlim("));
   assert.match(result.code, /set_xticklabels/);
+});
+
+test("a horizontal bar puts each label on the axis that actually shows it", () => {
+  const result = translated({
+    ...line,
+    kind: "bar",
+    aggregation: "mean",
+    orientation: "horizontal",
+  });
+  assert.match(result.code, /ax\.set_ylabel\("Training epoch"\)/);
+  assert.match(result.code, /ax\.set_xlabel\("Test accuracy \(%\)"\)/);
+  assert.match(result.code, /ax\.set_xlim\(left=0\)/);
+  assert.match(result.code, /ax\.set_yticklabels/);
+});
+
+test("a vertical bar keeps labels on their own axes", () => {
+  const result = translated({ ...line, kind: "bar", aggregation: "mean" });
+  assert.match(result.code, /ax\.set_xlabel\("Training epoch"\)/);
+  assert.match(result.code, /ax\.set_ylabel\("Test accuracy \(%\)"\)/);
+  assert.match(result.code, /ax\.set_ylim\(bottom=0\)/);
+});
+
+test("a horizontal bar sends the value limit to the axis that draws it", () => {
+  const result = translated({
+    ...line,
+    kind: "bar",
+    aggregation: "mean",
+    orientation: "horizontal",
+    y: { ...line.y, limits: [0, 100] },
+  });
+  assert.match(result.code, /ax\.set_xlim\(0, 100\)/);
+  assert.ok(!result.code.includes("set_ylim(0, 100)"));
 });
 
 test("an outside legend suppresses tight_layout", () => {

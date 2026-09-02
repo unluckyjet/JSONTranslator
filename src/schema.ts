@@ -94,6 +94,12 @@ export const LineSpec = z.object({
   kind: z.literal("line"),
   marker: z.boolean().default(false),
   sort_x: z.boolean().default(true),
+  aggregation: z
+    .enum(["none", "mean", "median"])
+    .default("none")
+    .describe(
+      "How to collapse repeated x values within a series. A curve over several seeds wants mean.",
+    ),
 });
 
 export const ScatterSpec = z.object({
