@@ -265,6 +265,76 @@ test("a horizontal reference label sits away from where the data ends", () => {
   assert.match(result.code, /xy=\(0\.01, 50\)/);
 });
 
+// --- composition ----------------------------------------------------------
+
+test("layers emit one mark each without touching the main draw", () => {
+  const result = translated({
+    ...line,
+    layers: [{ mark: "scatter", label: "raw" }, { mark: "rug" }, { mark: "rule", value: 80 }],
+  });
+  assert.match(result.code, /def draw_layers\(ax, frame\)/);
+  assert.match(result.code, /ax\.scatter\(/);
+  assert.match(result.code, /marker="\|"/);
+  assert.match(result.code, /ax\.axhline\(80/);
+  assert.match(result.code, /draw_layers\(ax, block\)/);
+});
+
+test("repeat swaps the y field per panel", () => {
+  const result = translated({ ...line, repeat: { fields: ["accuracy", "loss"], columns: 2 } });
+  assert.match(result.code, /REPEAT_FIELDS = \["accuracy", "loss"\]/);
+  assert.match(result.code, /def repeated_panels/);
+  assert.match(result.code, /globals\(\)\["Y_FIELD"\] = name/);
+});
+
+test("a cut axis takes its own path through main", () => {
+  const result = translated({ ...line, axis_break: { axis: "y", from: 30, to: 60 } });
+  assert.match(result.code, /def draw_with_break/);
+  assert.match(result.code, /upper, lower = draw_with_break\(fig, df\)/);
+  assert.match(result.code, /set_ylim\(top=30\)/);
+  assert.match(result.code, /set_ylim\(bottom=60\)/);
+  // The slanted marks are the whole point of a break.
+  assert.match(result.code, /marker": \[\(-1, -0\.6\), \(1, 0\.6\)\]/);
+});
+
+test("an inset marks where it came from", () => {
+  const result = translated({ ...line, inset: { x: [10, 20], y: [60, 80] } });
+  assert.match(result.code, /def add_inset/);
+  assert.match(result.code, /indicate_inset_zoom/);
+  assert.match(result.code, /zoom\.set_xlim\(10, 20\)/);
+});
+
+test("a nested facet carries both keys", () => {
+  const result = translated({ ...line, facet: { by: "dataset", rows: "split" } });
+  assert.match(result.code, /FACET_BY = "dataset"/);
+});
+
+test("a table writes markdown, latex and an image from one spec", () => {
+  const result = translated({
+    kind: "table",
+    x: { field: "dataset", label: "Dataset" },
+    y: { field: "accuracy", label: "Accuracy", unit: "%" },
+    group: "model",
+    aggregation: "mean",
+    highlight: "best_per_row",
+  });
+  assert.match(result.code, /def write_table/);
+  assert.match(result.code, /def render_table_image/);
+  assert.match(result.code, /HIGHLIGHT = "best_per_row"/);
+  // A table has no axes, so it must not go through the panel machinery.
+  assert.ok(!result.code.includes("draw_panel"));
+});
+
+test("a table honours whether higher is better", () => {
+  const lower = translated({
+    kind: "table",
+    x: { field: "model", label: "Model" },
+    y: { field: "latency", label: "Latency", unit: "ms" },
+    higher_is_better: false,
+    highlight: "best_per_column",
+  });
+  assert.match(lower.code, /HIGHER_IS_BETTER = False/);
+});
+
 // --- outputs --------------------------------------------------------------
 
 test("latex output carries the column width the size implies", () => {
