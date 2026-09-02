@@ -27,9 +27,9 @@ vermillion land 0.07 apart in relative luminance, under the 0.10 a reader needs.
 palette does not save it. Of all 40,320 orderings the best still leaves four series 0.094 apart.
 Hatching does save it, at any number of series.
 
-Line, scatter, bar, box, violin and heatmap. Faceting into panels, Pareto frontiers, stacked bars,
-smoothing, sorting, filtering, derived values, direct labelling, and venue presets that set the
-column width and font floor from the real submission guides.
+Line, scatter, bar, box, violin, heatmap and table. Faceting into panels, Pareto frontiers, stacked
+bars, smoothing, sorting, filtering, derived values, direct labelling, and venue presets that set
+the column width and font floor from the real submission guides.
 
 ## Third pass, the rest of the chart types
 
@@ -135,6 +135,62 @@ version through plotly, and a hash of the data file so a stale figure can say so
 `series_order` fixed colour inside one spec while figure 1 and figure 7 were free to disagree. Point
 `palette_lock` at a shared file and the first figure to mention a series claims an appearance for
 it. Adding a method later does not recolour the ones already in the paper.
+
+## Fifth pass, composition and a library on top
+
+| | |
+| --- | --- |
+| ![A y axis with 30 to 60 cut out and slanted marks at the join](docs/fifth-pass-axis-break.png) | ![The same curves with a magnified corner and its source region marked](docs/fifth-pass-inset.png) |
+
+*A cut axis and a zoomed inset*
+
+Extra marks over the same axes, one panel per metric, a gap cut out of an axis, and a magnified
+corner. Vega-Lite's operators compose recursively, which is more than this needs. What recurs in a
+paper is a short flat list, so that is what the spec takes.
+
+```json
+{
+  "layers": [{ "mark": "scatter", "label": "observations" }, { "mark": "rug" }],
+  "repeat": { "fields": ["accuracy", "loss", "latency_ms"], "columns": 3 },
+  "axis_break": { "axis": "y", "from": 30, "to": 60 },
+  "inset": { "x": [14, 20], "y": [65, 85], "corner": "lower_right" }
+}
+```
+
+A cut axis is drawn as two stacked axes with slanted marks at the join. The marks are the point.
+Without them a reader takes the axis for continuous and misreads every distance across the gap,
+which is the failure the truncation literature is about.
+
+There is a `table` kind now, because sometimes six numbers should not be a chart. A printed number
+is exact rather than estimated, so it outranks every graphical channel for reading one value. One
+spec writes markdown, LaTeX and an image, so the readme, the manuscript and the slides cannot drift
+apart, and `highlight` bolds the winner in each row or column.
+
+### Writing specs in Python
+
+The MCP tools are for an agent. `graphunslopify.Figure` is the same thing for a person in a
+notebook.
+
+```python
+from graphunslopify import Figure
+
+(
+    Figure.line("results.csv")
+    .x("epoch", "Training epoch")
+    .y("accuracy", "Test accuracy", unit="%")
+    .by("model", order=["baseline", "ours"], emphasise="ours")
+    .average_over("seed")
+    .claim("beats_everywhere", "ours", "baseline")
+    .venue("neurips")
+    .render()
+)
+```
+
+`average_over` sets the aggregation and the spread together, because doing one without the other
+throws away what a reader most needs. `render` posts the spec, writes the script beside the data and
+runs it, so what lands on disk is the same script an agent would have got. Nothing here
+reimplements the emitter, because two emitters drift. `Figure.from_profile` skips the guessing
+entirely by ranking candidates for a file and starting from the best one.
 
 ## Writing a spec
 
