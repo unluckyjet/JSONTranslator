@@ -1,0 +1,364 @@
+"""Checks that need pixels.
+
+The MCP server checks the spec. It cannot know that a tick label collides with
+its neighbour, that the legend sits on top of a data point, or that two series
+become the same colour to a reader with deuteranopia. Those need a rendered
+figure, so they run here, on the machine that has the data.
+
+Every check is geometric or colorimetric. None of them asks a model for an
+opinion, so the same figure always produces the same findings.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Iterable, Literal
+
+from .colour import composite_over_white, relative_luminance, worst_case_distance
+
+Severity = Literal["error", "warning"]
+
+#: Below this, a reader with normal vision cannot separate two series.
+MIN_COLOUR_DISTANCE = 11.0
+#: Journals routinely reject anything under this once the figure is scaled.
+MIN_TEXT_POINTS = 5.0
+ADVISORY_TEXT_POINTS = 6.0
+#: Two greys this close merge in a black and white print.
+MIN_GREYSCALE_SEPARATION = 0.10
+#: Above this share of the axes covered in marker ink, points hide each other.
+MAX_INK_FRACTION = 0.45
+#: A visible range this small next to the data's magnitude magnifies noise.
+MIN_RANGE_TO_MAGNITUDE = 0.10
+
+
+@dataclass
+class Finding:
+    severity: Severity
+    code: str
+    message: str
+
+    def __str__(self) -> str:
+        return f"{self.severity.upper():7} [{self.code}] {self.message}"
+
+
+@dataclass
+class Report:
+    findings: list[Finding] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return not any(f.severity == "error" for f in self.findings)
+
+    def add(self, severity: Severity, code: str, message: str) -> None:
+        self.findings.append(Finding(severity, code, message))
+
+    def __bool__(self) -> bool:
+        return bool(self.findings)
+
+    def __str__(self) -> str:
+        if not self.findings:
+            return "figure checks: no problems found"
+        lines = [f"figure checks: {len(self.findings)} finding(s)"]
+        lines.extend(f"  {finding}" for finding in self.findings)
+        return "\n".join(lines)
+
+
+def _overlaps(a: Any, b: Any, pad: float = 0.0) -> bool:
+    return not (
+        a.x1 + pad <= b.x0 or b.x1 + pad <= a.x0 or a.y1 + pad <= b.y0 or b.y1 + pad <= a.y0
+    )
+
+
+def _visible_texts(figure: Any) -> Iterable[Any]:
+    from matplotlib.text import Text
+
+    for artist in figure.findobj(Text):
+        if not artist.get_visible():
+            continue
+        if not (artist.get_text() or "").strip():
+            continue
+        yield artist
+
+
+def _check_text_size(figure: Any, report: Report, scale: float) -> None:
+    smallest = None
+    for artist in _visible_texts(figure):
+        effective = artist.get_fontsize() * scale
+        if smallest is None or effective < smallest[0]:
+            smallest = (effective, artist.get_text())
+
+    if smallest is None:
+        return
+
+    size, text = smallest
+    label = text if len(text) <= 24 else text[:21] + "..."
+    if size < MIN_TEXT_POINTS:
+        report.add(
+            "error",
+            "text_too_small",
+            f'"{label}" renders at {size:.1f}pt. Below {MIN_TEXT_POINTS}pt is unreadable in print.',
+        )
+    elif size < ADVISORY_TEXT_POINTS:
+        report.add(
+            "warning",
+            "text_near_minimum",
+            f'"{label}" renders at {size:.1f}pt, close to the {MIN_TEXT_POINTS}pt floor.',
+        )
+
+
+def _check_tick_collisions(axes: Any, renderer: Any, report: Report) -> None:
+    for name, ticks in (("x", axes.get_xticklabels()), ("y", axes.get_yticklabels())):
+        boxes = [
+            (label.get_text(), label.get_window_extent(renderer))
+            for label in ticks
+            if label.get_visible() and (label.get_text() or "").strip()
+        ]
+        for i in range(len(boxes) - 1):
+            left, right = boxes[i], boxes[i + 1]
+            if _overlaps(left[1], right[1]):
+                report.add(
+                    "error",
+                    "tick_labels_collide",
+                    f'{name} tick labels "{left[0]}" and "{right[0]}" overlap. '
+                    "Rotate them, thin them out, or widen the figure.",
+                )
+                break
+
+
+def _data_points_in_display(axes: Any, renderer: Any) -> list[Any]:
+    """Display-space points and patch boxes a legend could be sitting on."""
+    from matplotlib.collections import PathCollection
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Rectangle
+
+    found: list[Any] = []
+    for line in axes.get_lines():
+        if not line.get_visible():
+            continue
+        data = line.get_xydata()
+        if len(data):
+            found.extend(axes.transData.transform(data))
+    for collection in axes.collections:
+        if isinstance(collection, PathCollection) and collection.get_visible():
+            offsets = collection.get_offsets()
+            if len(offsets):
+                found.extend(axes.transData.transform(offsets))
+    for patch in axes.patches:
+        if isinstance(patch, Rectangle) and patch.get_visible():
+            box = patch.get_window_extent(renderer)
+            found.append((box.x0 + box.width / 2, box.y0 + box.height / 2))
+    _ = Line2D  # imported for the isinstance contract above staying honest
+    return found
+
+
+def _check_legend_occlusion(axes: Any, renderer: Any, report: Report) -> None:
+    legend = axes.get_legend()
+    if legend is None or not legend.get_visible():
+        return
+
+    box = legend.get_window_extent(renderer)
+    axes_box = axes.get_window_extent(renderer)
+    if not _overlaps(box, axes_box):
+        return  # anchored outside, nothing to cover
+
+    covered = sum(
+        1
+        for x, y in _data_points_in_display(axes, renderer)
+        if box.x0 <= x <= box.x1 and box.y0 <= y <= box.y1
+    )
+    if covered:
+        report.add(
+            "error",
+            "legend_covers_data",
+            f"the legend sits on top of {covered} plotted point(s). "
+            'Move it, or set legend.position to "outside_right".',
+        )
+
+
+def _check_overplotting(axes: Any, renderer: Any, report: Report) -> None:
+    from matplotlib.collections import PathCollection
+
+    axes_box = axes.get_window_extent(renderer)
+    axes_area = axes_box.width * axes_box.height
+    if axes_area <= 0:
+        return
+
+    dpi_scale = (axes.figure.dpi / 72.0) ** 2
+    ink = 0.0
+    points = 0
+    for collection in axes.collections:
+        if not isinstance(collection, PathCollection) or not collection.get_visible():
+            continue
+        offsets = collection.get_offsets()
+        points += len(offsets)
+        sizes = collection.get_sizes()
+        if len(sizes) == 0:
+            continue
+        mean_area = sum(sizes) / len(sizes) * dpi_scale
+        ink += mean_area * len(offsets)
+
+    if points and ink / axes_area > MAX_INK_FRACTION:
+        report.add(
+            "warning",
+            "overplotting",
+            f"{points} markers cover about {ink / axes_area:.0%} of the plotting area. "
+            "Points are hiding each other, so consider transparency or a summary.",
+        )
+
+
+def _series_appearance(axes: Any) -> list[tuple[str, tuple[float, float, float], str]]:
+    """Colour and second channel per legend entry, as the reader receives them."""
+    from matplotlib.colors import to_rgb
+
+    handles, labels = axes.get_legend_handles_labels()
+    series = []
+    for handle, label in zip(handles, labels):
+        colour = None
+        for getter in ("get_color", "get_facecolor", "get_edgecolor"):
+            if not hasattr(handle, getter):
+                continue
+            value = getattr(handle, getter)()
+            if value is None:
+                continue
+            # A hex string is a sequence too, so it has to short-circuit here.
+            if not isinstance(value, str):
+                if hasattr(value, "__len__") and len(value) and hasattr(value[0], "__len__"):
+                    value = value[0]
+            try:
+                colour = to_rgb(value)
+            except (ValueError, TypeError):
+                continue
+            break
+        if colour is None:
+            continue
+
+        alpha = handle.get_alpha() if hasattr(handle, "get_alpha") else None
+        seen = composite_over_white(colour, 1.0 if alpha is None else alpha)
+
+        channel = ""
+        if hasattr(handle, "get_linestyle"):
+            channel += str(handle.get_linestyle())
+        if hasattr(handle, "get_marker"):
+            channel += str(handle.get_marker())
+        series.append((label, seen, channel))
+    return series
+
+
+def _check_colour_separation(axes: Any, report: Report) -> None:
+    series = _series_appearance(axes)
+    if len(series) < 2:
+        return
+
+    distinct_channels = len({channel for _, _, channel in series}) == len(series)
+
+    for i in range(len(series)):
+        for j in range(i + 1, len(series)):
+            left_label, left_rgb, _ = series[i]
+            right_label, right_rgb, _ = series[j]
+            gap, condition = worst_case_distance(left_rgb, right_rgb)
+
+            if gap < MIN_COLOUR_DISTANCE:
+                severity: Severity = "error" if condition == "normal vision" else "warning"
+                if severity == "warning" and distinct_channels:
+                    continue
+                report.add(
+                    severity,
+                    "series_indistinguishable",
+                    f'"{left_label}" and "{right_label}" differ by only {gap:.1f} '
+                    f"under {condition}. A reader cannot tell them apart.",
+                )
+                continue
+
+            if distinct_channels:
+                continue
+            grey_gap = abs(relative_luminance(left_rgb) - relative_luminance(right_rgb))
+            if grey_gap < MIN_GREYSCALE_SEPARATION:
+                report.add(
+                    "warning",
+                    "greyscale_collision",
+                    f'"{left_label}" and "{right_label}" merge in greyscale. '
+                    "Give one a different line style or marker so colour is not the only channel.",
+                )
+
+
+def _bar_value_axis(axes: Any) -> str | None:
+    """Which axis carries bar length, or None when there are no bars."""
+    from matplotlib.patches import Rectangle
+
+    bars = [p for p in axes.patches if isinstance(p, Rectangle) and p.get_visible()]
+    if not bars:
+        return None
+    # A vertical bar starts on the y baseline; a horizontal one starts on x.
+    verticals = sum(1 for bar in bars if bar.get_width() < bar.get_height())
+    return "y" if verticals >= len(bars) / 2 else "x"
+
+
+def _check_truncated_bars(axes: Any, report: Report) -> None:
+    """A bar's length encodes its value, so a cut baseline overstates differences.
+
+    Readers keep misreading truncated bars even after being taught about it, so
+    this is an error rather than a matter of taste. Line charts are exempt; the
+    same truncation is defensible there.
+    """
+    which = _bar_value_axis(axes)
+    if which is None:
+        return
+
+    low, high = axes.get_ylim() if which == "y" else axes.get_xlim()
+    if min(low, high) > 0:
+        report.add(
+            "error",
+            "truncated_bar_axis",
+            f"the {which} axis starts at {low:g} rather than 0, so the bars overstate "
+            "the differences between them. Set baseline_zero, or use a line chart.",
+        )
+
+
+def _check_exaggeration(axes: Any, report: Report) -> None:
+    """A heavily zoomed axis turns a rounding error into a headline result."""
+    if _bar_value_axis(axes) is not None:
+        return  # bars are covered by the stricter rule above
+
+    low, high = axes.get_ylim()
+    span = abs(high - low)
+    magnitude = max(abs(low), abs(high))
+    if span <= 0 or magnitude <= 0:
+        return
+
+    if span / magnitude < MIN_RANGE_TO_MAGNITUDE:
+        report.add(
+            "warning",
+            "axis_exaggeration",
+            f"the y axis shows a span of {span:g} around values near {magnitude:g}, "
+            f"about {span / magnitude:.1%} of their size. Small differences will look large, "
+            "so say in the caption that the axis is zoomed.",
+        )
+
+
+def inspect_figure(figure: Any, target_width_in: float | None = None) -> Report:
+    """Check a rendered figure and return everything wrong with it.
+
+    `target_width_in` is the width the figure will occupy in the manuscript. Pass
+    it when the figure will be scaled down on the page, because a 12pt label in a
+    7in figure becomes 5.8pt once it is squeezed into a 3.4in column.
+    """
+    report = Report()
+
+    figure.canvas.draw()
+    renderer = figure.canvas.get_renderer()
+
+    figure_width = figure.get_size_inches()[0]
+    scale = 1.0
+    if target_width_in and figure_width > 0:
+        scale = min(target_width_in / figure_width, 1.0)
+
+    _check_text_size(figure, report, scale)
+    for axes in figure.get_axes():
+        _check_tick_collisions(axes, renderer, report)
+        _check_legend_occlusion(axes, renderer, report)
+        _check_overplotting(axes, renderer, report)
+        _check_colour_separation(axes, report)
+        _check_truncated_bars(axes, report)
+        _check_exaggeration(axes, report)
+
+    return report

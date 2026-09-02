@@ -1,0 +1,9 @@
+pyproject.toml
+graphunslopify/__init__.py
+graphunslopify/colour.py
+graphunslopify/inspect.py
+graphunslopify.egg-info/PKG-INFO
+graphunslopify.egg-info/SOURCES.txt
+graphunslopify.egg-info/dependency_links.txt
+graphunslopify.egg-info/requires.txt
+graphunslopify.egg-info/top_level.txt

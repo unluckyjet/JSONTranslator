@@ -1,0 +1,218 @@
+"""Each test builds a figure with one specific defect and checks it is caught.
+
+The point of these is that the checks fire on real matplotlib output rather than
+on a mock, because every bug this package exists to catch survived both a unit
+test and a successful render.
+"""
+
+from __future__ import annotations
+
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+import pytest
+
+from graphunslopify import inspect_figure
+from graphunslopify.colour import distance, simulate, worst_case_distance
+
+
+def codes(figure, **kwargs) -> set[str]:
+    return {finding.code for finding in inspect_figure(figure, **kwargs).findings}
+
+
+@pytest.fixture
+def close_figures():
+    yield
+    plt.close("all")
+
+
+pytestmark = pytest.mark.usefixtures("close_figures")
+
+
+# --- colour science -------------------------------------------------------
+
+
+def test_white_against_black_is_the_reference_maximum():
+    assert distance((1, 1, 1), (0, 0, 0)) == pytest.approx(100.0, abs=0.5)
+
+
+def test_a_colour_is_identical_to_itself():
+    assert distance((0.2, 0.6, 0.9), (0.2, 0.6, 0.9)) == pytest.approx(0.0)
+
+
+def test_red_against_green_collapses_for_a_deuteranope():
+    gap, condition = worst_case_distance((0.8, 0.1, 0.1), (0.1, 0.6, 0.2))
+    assert gap < 11.0
+    assert condition == "deuteranopia"
+
+
+def test_okabe_ito_blue_and_vermillion_survive_every_deficiency():
+    gap, _ = worst_case_distance((0.0, 0.447, 0.698), (0.835, 0.369, 0.0))
+    assert gap > 11.0
+
+
+def test_simulation_leaves_greys_alone():
+    grey = (0.5, 0.5, 0.5)
+    for deficiency in ("protanopia", "deuteranopia", "tritanopia"):
+        assert distance(grey, simulate(grey, deficiency)) < 2.0
+
+
+# --- the bug that shipped this morning ------------------------------------
+
+
+def test_series_muted_to_the_same_grey_are_caught():
+    fig, ax = plt.subplots()
+    for name in ("baseline", "+augment", "+distill"):
+        ax.plot([1, 2, 3], [1, 2, 3], color="#bdbdbd", label=name)
+    ax.plot([1, 2, 3], [2, 3, 4], color="#CC79A7", label="ours")
+    ax.legend()
+    assert "series_indistinguishable" in codes(fig)
+
+
+def test_the_okabe_ito_palette_passes():
+    fig, ax = plt.subplots()
+    for index, colour in enumerate(["#0072B2", "#D55E00", "#009E73", "#CC79A7"]):
+        ax.plot([1, 2, 3], [index, index + 1, index + 2], color=colour, label=f"s{index}")
+    ax.legend(loc="upper left")
+    assert "series_indistinguishable" not in codes(fig)
+
+
+def test_red_against_green_is_flagged_on_a_real_figure():
+    fig, ax = plt.subplots()
+    ax.plot([1, 2, 3], [1, 2, 3], color="#cc1a1a", label="control")
+    ax.plot([1, 2, 3], [2, 3, 4], color="#1a9933", label="treatment")
+    ax.legend(loc="upper left")
+    assert "series_indistinguishable" in codes(fig)
+
+
+def test_a_second_channel_excuses_a_colour_vision_clash():
+    fig, ax = plt.subplots()
+    ax.plot([1, 2, 3], [1, 2, 3], color="#cc1a1a", linestyle="-", label="control")
+    ax.plot([1, 2, 3], [2, 3, 4], color="#1a9933", linestyle="--", label="treatment")
+    ax.legend(loc="upper left")
+    assert "series_indistinguishable" not in codes(fig)
+
+
+# --- readability ----------------------------------------------------------
+
+
+def test_text_below_five_points_is_an_error():
+    fig, ax = plt.subplots()
+    ax.plot([1, 2, 3], [1, 2, 3])
+    ax.set_xlabel("Epoch", fontsize=4)
+    assert "text_too_small" in codes(fig)
+
+
+def test_scaling_a_wide_figure_into_a_column_shrinks_its_text():
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot([1, 2, 3], [1, 2, 3])
+    ax.set_xlabel("Epoch", fontsize=12)
+    ax.tick_params(labelsize=12)
+    assert "text_too_small" not in codes(fig)
+    assert "text_too_small" in codes(fig, target_width_in=3.4)
+
+
+def test_crowded_tick_labels_are_caught():
+    fig, ax = plt.subplots(figsize=(2.0, 2.0))
+    values = list(range(40))
+    ax.plot(values, values)
+    ax.set_xticks(values)
+    ax.set_xticklabels([f"category-{v}" for v in values])
+    assert "tick_labels_collide" in codes(fig)
+
+
+def test_room_to_breathe_produces_no_collision():
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot([1, 2, 3], [1, 2, 3])
+    assert "tick_labels_collide" not in codes(fig)
+
+
+# --- occlusion ------------------------------------------------------------
+
+
+def test_a_legend_sitting_on_the_data_is_caught():
+    fig, ax = plt.subplots()
+    ax.plot([0, 1, 2, 3, 4], [0, 1, 2, 3, 4], label="a series with a fairly long name")
+    ax.legend(loc="center")
+    assert "legend_covers_data" in codes(fig)
+
+
+def test_a_legend_outside_the_axes_is_fine():
+    fig, ax = plt.subplots()
+    ax.plot([0, 1, 2, 3, 4], [0, 1, 2, 3, 4], label="series")
+    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5))
+    assert "legend_covers_data" not in codes(fig)
+
+
+# --- integrity ------------------------------------------------------------
+
+
+def test_a_truncated_bar_axis_is_an_error():
+    fig, ax = plt.subplots()
+    ax.bar([0, 1, 2], [98, 99, 100])
+    ax.set_ylim(97, 101)
+    assert "truncated_bar_axis" in codes(fig)
+
+
+def test_a_bar_axis_reaching_zero_is_fine():
+    fig, ax = plt.subplots()
+    ax.bar([0, 1, 2], [98, 99, 100])
+    ax.set_ylim(bottom=0)
+    assert "truncated_bar_axis" not in codes(fig)
+
+
+def test_a_heavily_zoomed_line_axis_warns_about_exaggeration():
+    fig, ax = plt.subplots()
+    ax.plot([1, 2, 3], [99.90, 99.93, 99.95])
+    ax.set_ylim(99.89, 99.96)
+    assert "axis_exaggeration" in codes(fig)
+
+
+def test_a_line_chart_is_not_held_to_the_bar_baseline_rule():
+    fig, ax = plt.subplots()
+    ax.plot([1, 2, 3], [70, 75, 80])
+    ax.set_ylim(65, 85)
+    found = codes(fig)
+    assert "truncated_bar_axis" not in found
+    assert "axis_exaggeration" not in found
+
+
+# --- overplotting ---------------------------------------------------------
+
+
+def test_a_dense_scatter_warns():
+    fig, ax = plt.subplots(figsize=(3, 3))
+    xs = [i % 40 for i in range(3000)]
+    ys = [i // 40 for i in range(3000)]
+    ax.scatter(xs, ys, s=400)
+    assert "overplotting" in codes(fig)
+
+
+def test_a_sparse_scatter_does_not_warn():
+    fig, ax = plt.subplots(figsize=(4, 3))
+    ax.scatter([1, 2, 3, 4], [1, 2, 3, 4], s=18)
+    assert "overplotting" not in codes(fig)
+
+
+# --- the report object ----------------------------------------------------
+
+
+def test_a_clean_figure_reports_nothing():
+    fig, ax = plt.subplots(figsize=(4, 3))
+    ax.plot([1, 2, 3], [1, 2, 3], color="#0072B2", label="only series")
+    ax.legend(loc="upper left")
+    report = inspect_figure(fig)
+    assert report.findings == []
+    assert report.ok
+    assert "no problems found" in str(report)
+
+
+def test_warnings_alone_leave_the_report_ok():
+    fig, ax = plt.subplots()
+    ax.plot([1, 2, 3], [99.90, 99.93, 99.95])
+    ax.set_ylim(99.89, 99.96)
+    report = inspect_figure(fig)
+    assert report.findings
+    assert report.ok

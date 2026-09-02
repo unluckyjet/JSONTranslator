@@ -158,6 +158,54 @@ test("a legend below the axes lays out as a strip", () => {
   assert.ok(!right.code.includes("ncol="));
 });
 
+test("a second visual channel appears once colour stops being enough", () => {
+  const few = translated({ ...line, series_order: ["a", "b"] });
+  const many = translated({ ...line, series_order: ["a", "b", "c", "d", "e", "f"] });
+
+  assert.match(few.code, /SECOND_CHANNEL_THRESHOLD = 2/);
+  assert.match(few.code, /LINE_STYLES = \["-", "--", "-\.", ":"\]/);
+  for (const code of [few.code, many.code]) {
+    assert.match(code, /channel = LINE_STYLES\[index % len\(LINE_STYLES\)\] if total > SECOND_CHANNEL_THRESHOLD/);
+    assert.match(code, /linestyle=style\["linestyle"\]/);
+  }
+});
+
+test("scatter reaches for markers rather than line styles", () => {
+  const result = translated({ ...line, kind: "scatter" });
+  assert.match(result.code, /MARKERS = /);
+  assert.match(result.code, /marker=style\["marker"\]/);
+  assert.ok(!result.code.includes("LINE_STYLES"));
+});
+
+test("the script carries its own provenance", () => {
+  const result = translated(line);
+  assert.match(result.code, /tool version \d+\.\d+\.\d+, spec sha256:[0-9a-f]{16}/);
+  assert.match(result.code, /SPEC_HASH = "[0-9a-f]{16}"/);
+  assert.match(result.code, /SPEC_JSON = /);
+  assert.match(result.code, /DISCLOSURE = \(/);
+  assert.match(result.code, /"metadata": metadata_for\(fmt\)/);
+});
+
+test("the spec hash changes with the spec and not otherwise", () => {
+  const hashOf = (spec: unknown) => translated(spec).code.match(/SPEC_HASH = "([0-9a-f]+)"/)?.[1];
+  assert.equal(hashOf(line), hashOf(line));
+  assert.notEqual(hashOf(line), hashOf({ ...line, title: "different" }));
+});
+
+test("the render-time checker is called but never required", () => {
+  const result = translated(line);
+  assert.match(result.code, /from graphunslopify import inspect_figure/);
+  assert.match(result.code, /except ImportError:/);
+  assert.match(result.code, /skipping figure checks/);
+  assert.match(result.code, /target_width_in=3\.4/);
+  assert.match(result.code, /check\(fig\)/);
+});
+
+test("a double column figure tells the checker its real target width", () => {
+  const result = translated({ ...line, output: { size: "double_column" } });
+  assert.match(result.code, /target_width_in=7/);
+});
+
 test("output is deterministic", () => {
   assert.equal(translated(line).code, translated(line).code);
 });

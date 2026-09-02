@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: graphunslopify
+Version: 0.1.0
+Summary: Render-time readability and accessibility checks for matplotlib figures.
+Project-URL: Source, https://github.com/unluckyjet/JSONTranslator
+Requires-Python: >=3.10
+Requires-Dist: matplotlib>=3.9
