@@ -310,12 +310,11 @@ def main():
         flat = list(axes.flat)
         for index, (name, block) in enumerate(blocks):
             ax = flat[index]
-            # one panel per facet value
+
             draw_panel(ax, block)
-            # no extra layers
-            # no inset requested
+
+
             letter = str(name) if name is not None else None
-            # y label comes from the spec, or from the metric when repeating
             show_x = (index // columns) == rows - 1 or not SHARE_X
             show_y = (index % columns) == 0 or not SHARE_Y
             decorate_panel(ax, block, letter, show_x, show_y)
@@ -342,8 +341,8 @@ def main():
             fig.savefig(path, bbox_inches="tight", metadata=meta, **({"dpi": DPI} if fmt == "png" else {}))
             print(f"wrote {path}")
     plt.close(fig)
-    # no latex output requested
-    # no interactive output requested
+
+
     print(DISCLOSURE)
     print(f"data sha256:{DATA_HASH}")
     if not claims_hold:

@@ -300,7 +300,7 @@ function emitBar(spec: FigureSpec & { kind: "bar" }, out: string[]): void {
       "            linewidth=0.0,",
       spec.uncertainty
         ? `            ${errKey}=error_pair(block),`
-        : "            # no uncertainty requested",
+        : "",
       spec.uncertainty ? '            ecolor="#404040",' : "",
       spec.uncertainty ? "            capsize=2," : "",
       "        )",
@@ -315,7 +315,7 @@ function emitBar(spec: FigureSpec & { kind: "bar" }, out: string[]): void {
       "        0.7,",
       "        color=PALETTE[0],",
       "        zorder=2,",
-      spec.uncertainty ? `        ${errKey}=error_pair(block),` : "        # no uncertainty requested",
+      spec.uncertainty ? `        ${errKey}=error_pair(block),` : "",
       spec.uncertainty ? '        ecolor="#404040",' : "",
       spec.uncertainty ? "        capsize=2," : "",
       "    )",

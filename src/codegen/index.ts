@@ -352,17 +352,16 @@ function emitMain(spec: FigureSpec, out: string[]): void {
     "            ax = flat[index]",
     spec.repeat
       ? '            globals()["Y_FIELD"] = name'
-      : "            # one panel per facet value",
+      : "",
     ...(spec.repeat ? ['            letter_override = pretty(name)'] : []),
     "            draw_panel(ax, block)",
-    spec.layers?.length ? "            draw_layers(ax, block)" : "            # no extra layers",
-    spec.inset ? "            add_inset(ax, block)" : "            # no inset requested",
+    spec.layers?.length ? "            draw_layers(ax, block)" : "",
+    spec.inset ? "            add_inset(ax, block)" : "",
     spec.repeat
       ? '            letter = f"({chr(ord(chr(97)) + index)}) {letter_override}"'
       : letters
         ? '            letter = f"({chr(ord(chr(97)) + index)}) {name}" if name is not None else None'
         : "            letter = str(name) if name is not None else None",
-    "            # y label comes from the spec, or from the metric when repeating",
     "            show_x = (index // columns) == rows - 1 or not SHARE_X",
     "            show_y = (index % columns) == 0 or not SHARE_Y",
     "            decorate_panel(ax, block, letter, show_x, show_y)",
@@ -436,10 +435,10 @@ function emitSaveBlock(spec: FigureSpec, out: string[]): void {
   }
   out.push(
     "    plt.close(fig)",
-    spec.output.latex ? "    write_latex(description)" : "    # no latex output requested",
+    spec.output.latex ? "    write_latex(description)" : "",
     spec.output.interactive
       ? "    write_interactive(df)"
-      : "    # no interactive output requested",
+      : "",
     "    print(DISCLOSURE)",
     '    print(f"data sha256:{DATA_HASH}")',
     "    if not claims_hold:",
