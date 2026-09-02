@@ -1,6 +1,6 @@
 # What people complain about, and which check answers it
 
-Every rule in this repo traces to a documented complaint rather than to taste. There are 41 of them
+Every rule in this repo traces to a documented complaint rather than to taste. There are 47 of them
 on the spec and 11 on the rendered figure.
 This is the mapping, so a future change to a threshold has to argue with a source.
 
@@ -100,6 +100,49 @@ Two rules guard the choice. `stacked_without_group` catches stacking with nothin
 rest cannot be compared by eye. `stacking_signed_values` refuses to stack the output of
 `delta_vs_baseline`, which is negative by construction.
 
+## Ranking designs rather than only rejecting them
+
+Draco encodes visualisation design knowledge as hard and soft constraints with learned weights,
+solved by an ASP solver, and ranks candidates by violation cost. A 2026 follow-up synthesised
+knowledge bases beating Draco 2 by 1 to 15%, and noted Draco 2 still cannot separate designs in 4 of
+30 graphical perception studies, so this is live research rather than settled.
+
+`verify.ts` was an ad-hoc version of the same idea that could only reject. `src/perception.ts` adds
+the missing half: `designCost` charges a spec by weight and `suggest_figures` ranks candidates. The
+weights are hand-set from the perception ranking rather than learned, which is the obvious next step
+once there is a corpus of accepted figures.
+
+Cleveland and McGill ranked the elementary perceptual tasks by accuracy, position on a common scale
+first, then length, direction, angle, slope, area, volume, shading and saturation. Position measured
+1.4 to 2.5 times more accurate than length and 1.96 times more accurate than angle. Those ratios are
+quoted in the suggestion text, so a recommendation against a stacked bar carries a number rather
+than a preference.
+
+## Claims the figure has to support
+
+The integrity work names the failure precisely: a caption asserting a gain while the axis is
+truncated cannot be caught by pixel inspection, because the checker cannot read the manuscript. The
+Figure-seg benchmark holds 15,761 text-to-figure alignment instances built around exactly this.
+
+`src/claims.ts` moves the claim into the spec, where the script can test it. Ten kinds, each
+returning a verdict with its numbers. Only claims that hold are quoted in the alt text, and a failed
+claim prints an instruction not to write it in the caption.
+
+## Alt text
+
+PNAS and others now require alternative text. The four-level semantic model behind MatplotAlt runs
+encodings and axes, then statistics, then trends, then context. Level 1 comes from the spec, levels
+2 and 3 from the data at run time, and level 4 is left to the author because inventing why a result
+matters is the fabrication this whole tool exists to avoid. Alt text does not repeat the caption and
+never opens with "this figure shows", both straight from the guidance.
+
+## Repair, not just detection
+
+The agent evaluation survey reports capability rising faster than reliability, and describes models
+recognising an error, failing to fix it across many turns, and terminating. That is an interface
+problem. Findings now carry a machine-readable patch, `apply_fixes` applies them, and the loop has a
+budget so it reports what it could not repair instead of churning.
+
 ## Why not ask a model
 
 PlotGen and similar systems loop a multimodal model over the rendered image. Every check here is
@@ -117,4 +160,11 @@ worth reaching for only for the subjective residue, and so far there has not bee
 - [Truncating the Y-Axis: Threat or Menace?](https://arxiv.org/pdf/1907.02035)
 - [Truncating Bar Graphs Persistently Misleads Viewers](https://www.sciencedirect.com/science/article/abs/pii/S2211368120300978)
 - [The Perils of Chart Deception: How Misleading Visualizations Affect Vision-Language Models](https://arxiv.org/html/2508.09716v1)
+- [Automatic Synthesis of Visualization Design Knowledge Bases](https://arxiv.org/html/2601.19237)
+- [Graphical Perception, Cleveland and McGill, via CSE 412](https://courses.cs.washington.edu/courses/cse412/21sp/lectures/CSE412-Perception1.pdf)
+- [MatplotAlt: Adding Alt Text to Matplotlib Figures](https://arxiv.org/pdf/2503.20089)
+- [PNAS Improves Accessibility with Alternative Text](https://www.pnas.org/post/update/pnas-improves-accessibility-alternative-text)
+- [SciFigAlign: Scoring Scientific Figures by Alignment with Manuscript Evidence](https://arxiv.org/html/2607.27066)
+- [A Survey on Evaluation of LLM-based Agents](https://arxiv.org/html/2503.16416v2)
+- [Vega-Lite: A Grammar of Interactive Graphics](https://idl.cs.washington.edu/files/2017-VegaLite-InfoVis.pdf)
 - Machado, Oliveira and Fernandes (2009), *A Physiologically-based Model for Simulation of Color Vision Deficiency*, for the dichromacy matrices in `colour.py`.

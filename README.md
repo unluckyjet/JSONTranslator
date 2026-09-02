@@ -79,6 +79,35 @@ about their ranges.
 The third finding was mine, not the tool's. It told me the legend was sitting on three data points
 and suggested moving it outside, so I did.
 
+## Fourth pass, claims and alt text
+
+Two things came out of reading the integrity and accessibility literature.
+
+A figure can now carry the claim it is making, and the script tests it. The integrity work names
+this failure exactly: a caption asserting a gain while the axis is truncated cannot be caught by
+looking at pixels, because the checker cannot read the manuscript. So the claim goes in the spec.
+
+```json
+"claims": [
+  { "kind": "beats_everywhere", "subject": "ours", "reference": "baseline" },
+  { "kind": "gap_widens", "subject": "ours", "reference": "baseline" }
+]
+```
+
+Run against data where the baseline leads early, that prints:
+
+```text
+claims:
+  FAILS     ours is above baseline at every x (12 of 20 x values are not above baseline)
+            the figure does not support this. Do not write it in the caption.
+  HOLDS     ours pulls further ahead of baseline as x grows (gap moves from -5.2 to +3.8)
+```
+
+Alt text writes itself, which several journals now require. Levels one to three of the accessibility
+model are derivable, so the spec supplies the encoding and the script supplies the numbers and the
+trend. Level four is left to you rather than invented, because guessing at why a result matters is
+the fabrication this tool exists to avoid. Only claims that actually held get quoted.
+
 ## Writing a spec
 
 Do not guess at the data. Ask it:
@@ -92,8 +121,24 @@ That reports the columns, their roles, how many distinct values each has, and wh
 series, along with a starting spec. On the example data it picks `epoch` over `seed` as the x axis
 and adds the aggregation and confidence interval the repeats require.
 
-`list_recipes` has eleven known-good specs to start from, including `training_curve`, `pareto`,
-`confusion_matrix` and `faceted_curves`. `validate_spec` checks one without generating anything.
+Then hand that profile to `suggest_figures` and get candidates back, ranked by a weighted cost in
+the shape Draco uses. The weights come from the Cleveland and McGill accuracy ranking, so a design
+that reads by length scores worse than one that reads by position, and the suggestion quotes the
+measured ratio rather than asserting a preference.
+
+`apply_fixes` repairs a spec using its own findings. Every finding carries a machine-readable patch,
+because the agent literature reports models recognising an error and failing to act on it, which is
+an interface problem rather than a reasoning one. The loop has a budget so it says what it could not
+fix instead of churning.
+
+`list_recipes` has eleven known-good specs to start from. `validate_spec` checks one without
+generating anything, and `score_spec` costs one so two can be compared.
+
+## One appearance per series, across a whole paper
+
+`series_order` fixed colour inside a single spec while figure 1 and figure 7 were free to disagree.
+Set `palette_lock` to a shared file and the first figure to mention a series claims an appearance
+for it. Adding a method later does not recolour the ones already in the paper.
 
 ## Connecting
 
@@ -103,22 +148,29 @@ claude mcp add --transport http graph-unslopify https://json-translator-three.ve
 
 Your data never leaves your machine. You get back a script that reads your own CSV.
 
-## Animation
+## Other output formats
 
-Set `animate` and the same figure draws itself.
+Set `animate` and the same figure draws itself as a gif or an mp4.
 
 ```json
 { "animate": { "style": "draw", "duration_s": 4, "easing": "smooth", "format": "gif" } }
 ```
 
-Built on matplotlib, not manim. Manim wants cairo, ffmpeg and often LaTeX, and draws its own axes
-rather than the ones this spent so long getting right. What makes those animations read well is
+Set `output.interactive` and you also get a self-contained HTML figure through plotly, with hover
+and zoom, which is what a project page wants and a paper does not. Set `output.latex` and you get an
+`\includegraphics` block at the right column width with the caption and alt text already in it.
+
+On manim, with evidence rather than an opinion. It does not install here: `moderngl` and `glcontext`
+fail to build wheels, needing a C toolchain. Even where it does install it draws its own axes rather
+than the ones this spent so long getting right. What actually makes those animations read well is
 easing and staged construction, and both are a few lines over `FuncAnimation`. The rate functions
-are ports of manim's and keep its names.
+are ports of manim's and keep its names, so `easing: "rush_into"` does what you would expect. plotly
+and scipy install cleanly and are used; scipy makes the t-test and Mann-Whitney options real rather
+than a fallback.
 
 ## What checks the work
 
-Forty-one rules run on the spec alone, on the server. The rendered figure is checked separately by
+Forty-seven rules run on the spec alone, on the server. The rendered figure is checked separately by
 the Python package, which measures text at the width it will be printed, finds colliding tick
 labels, a legend covering data, series a reader cannot separate, series that merge in greyscale, a
 truncated bar axis, and panels that disagree.

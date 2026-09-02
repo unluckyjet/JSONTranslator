@@ -135,7 +135,7 @@ const rejected = await rpc(
 );
 check("an unknown chart kind is rejected", rejected.result?.isError === true, rejected);
 
-const suggested = await rpc(
+const ranked = await rpc(
   "tools/call",
   {
     name: "suggest_figures",
@@ -153,12 +153,12 @@ const suggested = await rpc(
   },
   10,
 );
-const suggestedText: string = suggested.result?.content?.[0]?.text ?? "";
-check("suggest_figures ranks candidates", suggestedText.includes("cost 0"), suggestedText.slice(0, 200));
+const rankedText: string = ranked.result?.content?.[0]?.text ?? "";
+check("suggest_figures ranks candidates", rankedText.includes("cost 0"), rankedText.slice(0, 200));
 check(
   "the top suggestion aggregates over the repeats",
-  suggestedText.includes('"aggregation": "mean"'),
-  suggestedText.slice(0, 300),
+  rankedText.includes('"aggregation": "mean"'),
+  rankedText.slice(0, 300),
 );
 
 const repaired = await rpc(
