@@ -13,3 +13,9 @@ Regenerate with `node scripts/baseline.ts`, then look at the image diff.
 | `06-accuracy-vs-latency` | scatter | clean |
 | `07-params-trendline` | scatter | clean |
 | `08-compact-double-column` | line | clean |
+| `09-uncertainty-band` | line | clean |
+| `10-faceted-benchmarks` | bar | clean |
+| `11-seed-spread` | box | clean |
+| `12-sweep-heatmap` | heatmap | clean |
+| `13-direct-labels` | line | clean |
+| `14-animated-curve` | line | clean |

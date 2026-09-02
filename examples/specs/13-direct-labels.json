@@ -1,0 +1,40 @@
+{
+  "kind": "line",
+  "x": {
+    "field": "epoch",
+    "label": "Training epoch"
+  },
+  "y": {
+    "field": "accuracy",
+    "label": "Test accuracy",
+    "unit": "%"
+  },
+  "group": "model",
+  "aggregation": "mean",
+  "series_order": [
+    "baseline",
+    "+augment",
+    "+distill",
+    "ours"
+  ],
+  "emphasis": {
+    "series": "ours"
+  },
+  "legend": {
+    "style": "direct"
+  },
+  "data": {
+    "path": "data/training.csv",
+    "columns": [
+      "model",
+      "seed",
+      "epoch",
+      "accuracy",
+      "loss"
+    ]
+  },
+  "output": {
+    "stem": "13-direct-labels",
+    "size": "double_column"
+  }
+}

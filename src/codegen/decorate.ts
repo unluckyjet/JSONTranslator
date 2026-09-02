@@ -343,7 +343,8 @@ export function emitDecoratePanel(spec: FigureSpec, out: string[]): void {
       `        linestyle=${style.style},`,
       `        linewidth=${style.width},`,
       "        zorder=0,",
-      `        label=${pyOptStr(line.label)},`,
+      // A labelled line carries its name inline, so it stays out of the legend.
+      `        label=${line.label ? "None" : pyOptStr(line.label)},`,
       "    )",
     );
     if (line.label) {

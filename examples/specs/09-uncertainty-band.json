@@ -1,0 +1,62 @@
+{
+  "kind": "line",
+  "title": "Accuracy over training, mean of three seeds",
+  "x": {
+    "field": "epoch",
+    "label": "Training epoch"
+  },
+  "y": {
+    "field": "accuracy",
+    "label": "Test accuracy",
+    "unit": "%"
+  },
+  "group": "model",
+  "aggregation": "mean",
+  "uncertainty": {
+    "kind": "ci",
+    "level": 0.95,
+    "over": "seed",
+    "display": "band"
+  },
+  "series_order": [
+    "baseline",
+    "+augment",
+    "+distill",
+    "ours"
+  ],
+  "emphasis": {
+    "series": "ours"
+  },
+  "reference_lines": [
+    {
+      "axis": "y",
+      "value": 25,
+      "meaning": "chance",
+      "label": "chance"
+    }
+  ],
+  "annotate": [
+    {
+      "at": "max",
+      "series": "ours",
+      "text": "best"
+    }
+  ],
+  "legend": {
+    "position": "outside_right"
+  },
+  "data": {
+    "path": "data/training.csv",
+    "columns": [
+      "model",
+      "seed",
+      "epoch",
+      "accuracy",
+      "loss"
+    ]
+  },
+  "output": {
+    "stem": "09-uncertainty-band",
+    "size": "double_column"
+  }
+}

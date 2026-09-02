@@ -1,0 +1,38 @@
+{
+  "kind": "bar",
+  "title": "Accuracy per benchmark",
+  "x": {
+    "field": "model",
+    "label": "Model"
+  },
+  "y": {
+    "field": "accuracy",
+    "label": "Top-1 accuracy",
+    "unit": "%"
+  },
+  "facet": {
+    "by": "dataset",
+    "columns": 3,
+    "share_y": true,
+    "panel_letters": true
+  },
+  "aggregation": "mean",
+  "value_labels": true,
+  "legend": {
+    "show": false
+  },
+  "data": {
+    "path": "data/benchmarks.csv",
+    "columns": [
+      "model",
+      "dataset",
+      "accuracy",
+      "latency_ms",
+      "params_m"
+    ]
+  },
+  "output": {
+    "stem": "10-faceted-benchmarks",
+    "size": "double_column"
+  }
+}

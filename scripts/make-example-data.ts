@@ -69,10 +69,24 @@ for (const model of MODELS) {
   }
 }
 
+const LEARNING_RATES = [0.0001, 0.0003, 0.001, 0.003];
+const BATCH_SIZES = [16, 32, 64, 128];
+
+const sweep = ["learning_rate,batch_size,accuracy"];
+for (const rate of LEARNING_RATES) {
+  for (const batch of BATCH_SIZES) {
+    // A ridge with a best setting in the middle, which is what a sweep looks like.
+    const distance = Math.abs(Math.log10(rate) + 3) + Math.abs(Math.log2(batch) - 5) / 2;
+    sweep.push(`${rate},${batch},${(82 - distance * 4.5 + jitter(0.5)).toFixed(2)}`);
+  }
+}
+
 mkdirSync(OUT, { recursive: true });
+writeFileSync(join(OUT, "sweep.csv"), sweep.join("\n") + "\n");
 writeFileSync(join(OUT, "training.csv"), training.join("\n") + "\n");
 writeFileSync(join(OUT, "benchmarks.csv"), benchmarks.join("\n") + "\n");
 
 console.log(`training.csv   ${training.length - 1} rows`);
 console.log(`benchmarks.csv ${benchmarks.length - 1} rows`);
+console.log(`sweep.csv      ${sweep.length - 1} rows`);
 console.log(`written to ${OUT}`);

@@ -1,0 +1,41 @@
+{
+  "kind": "box",
+  "title": "Run-to-run variance",
+  "x": {
+    "field": "model",
+    "label": "Model"
+  },
+  "y": {
+    "field": "accuracy",
+    "label": "Accuracy across epochs",
+    "unit": "%"
+  },
+  "show_points": false,
+  "filter": [
+    {
+      "field": "epoch",
+      "op": "gte",
+      "value": 20
+    }
+  ],
+  "sort": {
+    "by": "value",
+    "direction": "desc"
+  },
+  "legend": {
+    "show": false
+  },
+  "data": {
+    "path": "data/training.csv",
+    "columns": [
+      "model",
+      "seed",
+      "epoch",
+      "accuracy",
+      "loss"
+    ]
+  },
+  "output": {
+    "stem": "11-seed-spread"
+  }
+}

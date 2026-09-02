@@ -1,0 +1,51 @@
+{
+  "kind": "line",
+  "title": "Accuracy over training",
+  "x": {
+    "field": "epoch",
+    "label": "Training epoch"
+  },
+  "y": {
+    "field": "accuracy",
+    "label": "Test accuracy",
+    "unit": "%"
+  },
+  "group": "model",
+  "aggregation": "mean",
+  "series_order": [
+    "baseline",
+    "+augment",
+    "+distill",
+    "ours"
+  ],
+  "emphasis": {
+    "series": "ours"
+  },
+  "legend": {
+    "position": "outside_right"
+  },
+  "animate": {
+    "style": "draw",
+    "duration_s": 4,
+    "easing": "smooth",
+    "stagger_s": 0.3,
+    "format": "gif"
+  },
+  "data": {
+    "path": "data/training.csv",
+    "columns": [
+      "model",
+      "seed",
+      "epoch",
+      "accuracy",
+      "loss"
+    ]
+  },
+  "output": {
+    "stem": "14-animated-curve",
+    "size": "double_column",
+    "formats": [
+      "png"
+    ]
+  }
+}

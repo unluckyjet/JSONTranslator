@@ -1,0 +1,27 @@
+{
+  "kind": "heatmap",
+  "title": "Hyperparameter sweep",
+  "x": {
+    "field": "learning_rate",
+    "label": "Learning rate"
+  },
+  "y": {
+    "field": "batch_size",
+    "label": "Batch size"
+  },
+  "value": "accuracy",
+  "value_label": "Validation accuracy (%)",
+  "aggregation": "mean",
+  "annotate_cells": true,
+  "data": {
+    "path": "data/sweep.csv",
+    "columns": [
+      "learning_rate",
+      "batch_size",
+      "accuracy"
+    ]
+  },
+  "output": {
+    "stem": "12-sweep-heatmap"
+  }
+}
