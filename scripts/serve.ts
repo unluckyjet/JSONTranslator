@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { Readable } from "node:stream";
 import { GET as mcpGet, POST as mcpPost, DELETE as mcpDelete } from "../api/mcp.ts";
 import { POST as convertPost } from "../api/convert.ts";
 import { GET as healthGet } from "../api/health.ts";
@@ -18,25 +19,33 @@ const routes: Record<string, Partial<Record<string, Handler>>> = {
 
 async function toRequest(req: IncomingMessage, origin: string): Promise<Request> {
   const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
+  for await (const chunk of req) chunks.push(Buffer.from(chunk));
   const body = Buffer.concat(chunks);
+
+  // A repeated header arrives as an array, which Headers takes one value at a time.
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(req.headers)) {
+    if (Array.isArray(value)) for (const one of value) headers.append(name, one);
+    else if (value !== undefined) headers.set(name, value);
+  }
+
   return new Request(new URL(req.url ?? "/", origin), {
     method: req.method,
-    headers: req.headers as Record<string, string>,
+    headers,
     body: body.length > 0 ? body : undefined,
   });
 }
 
 async function send(response: Response, res: ServerResponse): Promise<void> {
   res.writeHead(response.status, Object.fromEntries(response.headers));
-  if (!response.body) {
+  const body = response.body;
+  if (!body) {
     res.end();
     return;
   }
-  for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
-    res.write(chunk);
-  }
-  res.end();
+  await new Promise<void>((resolve, reject) => {
+    Readable.fromWeb(body).pipe(res).on("finish", resolve).on("error", reject);
+  });
 }
 
 const port = Number(process.env.PORT ?? 3000);

@@ -1,6 +1,6 @@
 import { designCost } from "./perception.ts";
 import { FigureSpec } from "./schema.ts";
-import { hasErrors, verify } from "./verify.ts";
+import { hasErrors, verify, type Finding } from "./verify.ts";
 
 /**
  * Candidate figures for a data profile, ranked.
@@ -235,7 +235,9 @@ export function repair(spec: Record<string, unknown>, budget = 3): RepairResult 
     }
 
     const findings = verify(parsed.data);
-    const fixable = findings.filter((f) => f.fix && !applied.includes(f.code));
+    const fixable = findings.filter(
+      (f): f is Finding & { fix: Record<string, unknown> } => !!f.fix && !applied.includes(f.code),
+    );
     if (!fixable.length) {
       return {
         spec: current,
@@ -246,7 +248,7 @@ export function repair(spec: Record<string, unknown>, budget = 3): RepairResult 
     }
 
     for (const finding of fixable) {
-      current = applyFix(current, finding.fix!);
+      current = applyFix(current, finding.fix);
       applied.push(finding.code);
     }
   }

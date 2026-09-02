@@ -1,4 +1,4 @@
-import type { FigureSpec } from "../schema.ts";
+import type { FigureSpec, PlottedSpec } from "../schema.ts";
 import { pyStr } from "./py.ts";
 import { BAND_ALPHA, PRESETS, RAW_ALPHA } from "./theme.ts";
 
@@ -486,7 +486,7 @@ function emitHeatmap(spec: FigureSpec & { kind: "heatmap" }, out: string[]): voi
   out.push("");
 }
 
-export function emitDraw(spec: FigureSpec, out: string[]): void {
+export function emitDraw(spec: PlottedSpec, out: string[]): void {
   emitSeriesHelpers(spec, out);
   if (spec.kind === "bar" || spec.kind === "box" || spec.kind === "violin") {
     emitCategories(spec, out);
@@ -509,5 +509,9 @@ export function emitDraw(spec: FigureSpec, out: string[]): void {
     case "heatmap":
       emitHeatmap(spec, out);
       break;
+    default: {
+      const unhandled: never = spec;
+      throw new Error(`no emitter for kind ${JSON.stringify(unhandled)}`);
+    }
   }
 }

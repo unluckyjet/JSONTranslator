@@ -106,6 +106,8 @@ export const FilterSpec = z.object({
   value: z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number()]))]),
 });
 
+export type FilterOp = z.infer<typeof FilterSpec>["op"];
+
 export const TransformSpec = z.object({
   kind: z
     .enum(["none", "delta_vs_baseline", "percent_of_baseline", "cumulative", "normalize"])
@@ -186,6 +188,8 @@ export const SignificanceSpec = z.object({
     .describe("Category pairs to compare. The script runs the test rather than assuming a result."),
   alpha: z.number().min(0.0001).max(0.2).default(0.05),
 });
+
+export type Significance = z.infer<typeof SignificanceSpec>;
 
 export const SecondaryAxisSpec = z.object({
   field: z.string().min(1),
@@ -462,6 +466,9 @@ export function usesSeriesColours(spec: FigureSpec): boolean {
 }
 
 /** Kinds that draw marks on axes, as opposed to laying out text. */
-export function isPlotted(spec: FigureSpec): boolean {
+export function isPlotted(spec: FigureSpec): spec is PlottedSpec {
   return spec.kind !== "table";
 }
+
+/** What the mark emitters accept. A table lays out text and never reaches them. */
+export type PlottedSpec = Exclude<FigureSpec, { kind: "table" }>;

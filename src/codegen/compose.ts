@@ -104,6 +104,10 @@ export function emitLayers(spec: FigureSpec, out: string[]): void {
           `    ax.axhline(${layer.value ?? 0}, color=${colour}, linewidth=1.0, linestyle=":", zorder=${zorder}, label=${label})`,
         );
         break;
+      default: {
+        const unhandled: never = layer.mark;
+        throw new Error(`no emitter for layer mark ${String(unhandled)}`);
+      }
     }
   }
   out.push("");

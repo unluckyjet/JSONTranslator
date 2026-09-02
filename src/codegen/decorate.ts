@@ -1,4 +1,4 @@
-import { hasCategoricalX, type AxisSpec, type FigureSpec } from "../schema.ts";
+import { hasCategoricalX, type AxisSpec, type FigureSpec, type Significance } from "../schema.ts";
 import { pyOptStr, pyStr } from "./py.ts";
 import { LEGEND_LOCATIONS, PRESETS, REFERENCE_STYLES } from "./theme.ts";
 
@@ -117,7 +117,7 @@ export function emitHelpers(spec: FigureSpec, out: string[]): void {
   }
 
   if (spec.kind === "bar" && spec.significance) {
-    emitSignificance(spec, out);
+    emitSignificance(spec.significance, out);
   }
 
   if (spec.annotate?.length) emitAnnotations(spec, out);
@@ -148,8 +148,8 @@ export function emitHelpers(spec: FigureSpec, out: string[]): void {
   void preset;
 }
 
-function emitSignificance(spec: FigureSpec & { kind: "bar" }, out: string[]): void {
-  const method = spec.significance!.method;
+function emitSignificance(significance: Significance, out: string[]): void {
+  const method = significance.method;
   out.push(
     "",
     "def compare(left, right):",

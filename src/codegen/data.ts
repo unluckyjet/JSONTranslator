@@ -1,4 +1,4 @@
-import type { FigureSpec } from "../schema.ts";
+import type { FigureSpec, FilterOp } from "../schema.ts";
 import { pyList, pyStr, pyValue } from "./py.ts";
 import { READERS } from "./theme.ts";
 
@@ -10,7 +10,7 @@ import { READERS } from "./theme.ts";
  * the rows that survive, which is what an author asking for both intends.
  */
 
-const OPERATORS: Record<string, (field: string, value: string) => string> = {
+const OPERATORS: Record<FilterOp, (field: string, value: string) => string> = {
   eq: (f, v) => `df[${f}] == ${v}`,
   ne: (f, v) => `df[${f}] != ${v}`,
   lt: (f, v) => `df[${f}] < ${v}`,
@@ -30,7 +30,7 @@ export function emitPrepare(spec: FigureSpec, out: string[]): void {
   const body: string[] = [];
 
   for (const clause of spec.filter ?? []) {
-    const build = OPERATORS[clause.op]!;
+    const build = OPERATORS[clause.op];
     body.push(`    df = df[${build(pyStr(clause.field), pyValue(clause.value))}]`);
   }
   if (spec.filter?.length) {
@@ -171,6 +171,10 @@ export function emitSummarise(spec: FigureSpec, out: string[]): void {
         "    low, high = bootstrap_interval(frame, keys)",
       );
       break;
+    default: {
+      const unhandled: never = uncertainty.kind;
+      throw new Error(`no spread emitter for uncertainty ${String(unhandled)}`);
+    }
   }
 
   out.push(
