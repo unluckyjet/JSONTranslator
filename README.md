@@ -2,6 +2,8 @@
 
 An MCP server that will turn JSON plot specifications into matplotlib code.
 
+Live at [json-translator-three.vercel.app](https://json-translator-three.vercel.app).
+
 It does not do that yet. Right now it accepts JSON and answers `json successfully passed` with a
 description of what arrived. That sounds trivial, and the acknowledgement is, but the part worth
 having is underneath it. The MCP transport, the tool registration, and the input handling all work,
@@ -41,7 +43,7 @@ generator lands, that field is where the parsed plot spec will report itself.
 Claude Code:
 
 ```bash
-claude mcp add --transport http graph-unslopify https://<your-deployment>.vercel.app/api/mcp
+claude mcp add --transport http graph-unslopify https://json-translator-three.vercel.app/api/mcp
 ```
 
 Cursor or Windsurf, in `mcp.json`:
@@ -50,7 +52,7 @@ Cursor or Windsurf, in `mcp.json`:
 {
   "mcpServers": {
     "graph-unslopify": {
-      "url": "https://<your-deployment>.vercel.app/api/mcp"
+      "url": "https://json-translator-three.vercel.app/api/mcp"
     }
   }
 }
@@ -59,7 +61,7 @@ Cursor or Windsurf, in `mcp.json`:
 ## Calling it without MCP
 
 ```bash
-curl -X POST https://<your-deployment>.vercel.app/api/convert \
+curl -X POST https://json-translator-three.vercel.app/api/convert \
   -H 'content-type: application/json' \
   -d '{"kind":"line","x":[1,2,3],"y":[4,5,6]}'
 ```
@@ -94,7 +96,7 @@ Import the repo at [vercel.com/new](https://vercel.com/new). Framework preset is
 the build command empty. Everything runs on the Hobby tier, so it costs nothing. Vercel redeploys
 on every push to `main` once the project is linked.
 
-After a deploy, run `node scripts/smoke.ts https://<your-deployment>.vercel.app`. If it prints five
+After a deploy, run `node scripts/smoke.ts https://json-translator-three.vercel.app`. If it prints five
 passes, a real MCP client can connect.
 
 ## Layout

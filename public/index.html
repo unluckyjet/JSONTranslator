@@ -32,16 +32,16 @@
     <table>
       <tr><th>Path</th><th>Method</th><th>Purpose</th></tr>
       <tr><td><code>/api/mcp</code></td><td>GET, POST, DELETE</td><td>MCP Streamable HTTP</td></tr>
-      <tr><td><code>/api/convert</code></td><td>POST</td><td>Plain HTTP twin of the tool</td></tr>
+      <tr><td><code>/api/convert</code></td><td>POST</td><td>Same behaviour without MCP, for curl</td></tr>
       <tr><td><code><a href="/api/health">/api/health</a></code></td><td>GET</td><td>Liveness</td></tr>
     </table>
 
     <h2>Connect an MCP client</h2>
     <pre><code>claude mcp add --transport http graph-unslopify \
-  https://&lt;this-host&gt;/api/mcp</code></pre>
+  https://json-translator-three.vercel.app/api/mcp</code></pre>
 
     <h2>Or just curl it</h2>
-    <pre><code>curl -X POST https://&lt;this-host&gt;/api/convert \
+    <pre><code>curl -X POST https://json-translator-three.vercel.app/api/convert \
   -H 'content-type: application/json' \
   -d '{"kind":"line","x":[1,2,3],"y":[4,5,6]}'</code></pre>
 
