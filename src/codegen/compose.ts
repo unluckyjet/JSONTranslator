@@ -112,18 +112,28 @@ export function emitLayers(spec: FigureSpec, out: string[]): void {
 export function emitInset(spec: FigureSpec, out: string[]): void {
   if (!spec.inset) return;
   const { corner, size } = spec.inset;
+
+  // The inset carries its own tick labels, so a bottom corner needs clearance
+  // above the parent's x axis or the two rows of numbers run together.
+  const bottom = 0.16;
+  const top = Number((1 - size - 0.04).toFixed(3));
+  const left = 0.1;
+  const right = Number((1 - size - 0.04).toFixed(3));
+
   const placement: Record<string, string> = {
-    upper_left: `[0.06, ${(1 - size - 0.06).toFixed(3)}, ${size}, ${size}]`,
-    upper_right: `[${(1 - size - 0.06).toFixed(3)}, ${(1 - size - 0.06).toFixed(3)}, ${size}, ${size}]`,
-    lower_left: `[0.06, 0.08, ${size}, ${size}]`,
-    lower_right: `[${(1 - size - 0.06).toFixed(3)}, 0.08, ${size}, ${size}]`,
+    upper_left: `[${left}, ${top}, ${size}, ${size}]`,
+    upper_right: `[${right}, ${top}, ${size}, ${size}]`,
+    lower_left: `[${left}, ${bottom}, ${size}, ${size}]`,
+    lower_right: `[${right}, ${bottom}, ${size}, ${size}]`,
   };
 
   out.push(
     "",
     "def add_inset(ax, frame):",
-    "    # A magnified copy with its source region marked, so the reader can see",
-    "    # which part of the figure it came from.",
+    "    # A magnified copy of one region, with that region outlined on the main",
+    "    # axes. The outline and the inset border share a colour, which is what",
+    "    # ties them together. Connector lines would do the same job but they read",
+    "    # as a perspective box, and this is a flat figure.",
     `    zoom = ax.inset_axes(${placement[corner]})`,
     "    draw_panel(zoom, frame)",
     `    zoom.set_xlim(${spec.inset.x[0]}, ${spec.inset.x[1]})`,
@@ -134,10 +144,20 @@ export function emitInset(spec: FigureSpec, out: string[]): void {
     "    legend = zoom.get_legend()",
     "    if legend is not None:",
     "        legend.remove()",
-    "    zoom.tick_params(labelsize=ANNOTATION_PT - 2)",
-    '    for side in ("top", "right"):',
-    "        zoom.spines[side].set_visible(True)",
-    '    ax.indicate_inset_zoom(zoom, edgecolor="#767676", alpha=0.7, linewidth=0.8)',
+    "    zoom.tick_params(labelsize=ANNOTATION_PT - 2, length=2, pad=1.5)",
+    "    zoom.set_facecolor(\"white\")",
+    "    zoom.patch.set_alpha(0.96)",
+    "    for side, spine in zoom.spines.items():",
+    "        spine.set_visible(True)",
+    "        spine.set_color(INSET_EDGE)",
+    "        spine.set_linewidth(0.9)",
+    "",
+    "    outline, connectors = ax.indicate_inset_zoom(",
+    "        zoom, edgecolor=INSET_EDGE, alpha=1.0, linewidth=0.9",
+    "    )",
+    "    outline.set_facecolor(\"none\")",
+    "    for line in connectors or ():",
+    "        line.set_visible(False)",
     "",
   );
 }

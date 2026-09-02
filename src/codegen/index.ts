@@ -122,6 +122,7 @@ function emitPreamble(spec: FigureSpec, out: string[]): void {
   out.push(`SERIES_COUNT = ${spec.series_order ? spec.series_order.length : 1}`);
   out.push(`PALETTE_LOCK = ${pyOptStr(spec.palette_lock)}`);
   if (spec.layers?.length) out.push('LAYER_COLOURS = ["#767676", "#404040", "#a0a0a0"]');
+  if (spec.inset) out.push('INSET_EDGE = "#5a5a5a"');
   if (spec.repeat) {
     out.push(`REPEAT_FIELDS = ${pyList(spec.repeat.fields)}`);
     out.push(`REPEAT_COLUMNS = ${spec.repeat.columns}`);

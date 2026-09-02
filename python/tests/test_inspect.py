@@ -213,6 +213,26 @@ def test_a_label_landing_on_the_title_is_caught():
     assert "labels_collide" in codes(fig)
 
 
+def test_an_inset_crowding_its_parent_axis_is_caught():
+    """Two axes, so neither the tick check nor the old text check saw it."""
+    fig, ax = plt.subplots(figsize=(4, 3))
+    ax.plot(range(20), range(20))
+    # Placed low enough that its tick labels sit on the parent's.
+    zoom = ax.inset_axes([0.55, -0.02, 0.4, 0.3])
+    zoom.plot(range(20), range(20))
+    zoom.set_xlim(10, 15)
+    assert "labels_collide" in codes(fig)
+
+
+def test_an_inset_with_clearance_is_fine():
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(range(20), range(20))
+    zoom = ax.inset_axes([0.55, 0.16, 0.35, 0.35])
+    zoom.plot(range(20), range(20))
+    zoom.set_xlim(10, 15)
+    assert "labels_collide" not in codes(fig)
+
+
 def test_well_spaced_labels_do_not_collide():
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.plot([1, 2, 3], [1, 2, 3])

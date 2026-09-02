@@ -127,50 +127,61 @@ def _check_tick_collisions(axes: Any, renderer: Any, report: Report) -> None:
 
 
 def _check_text_collisions(figure: Any, renderer: Any, report: Report) -> None:
-    """Any two pieces of text landing on each other, not only tick labels.
+    """Any two pieces of text landing on each other.
 
-    Annotations, reference line labels and the title are placed independently,
-    so nothing stops them overlapping. A label sitting on the title renders
-    perfectly and is unreadable, which is the class of defect this whole package
-    exists to catch.
+    Tick labels within one axes have their own check, which knows they come in a
+    row. This one covers everything else: an annotation on the title, a
+    reference label on an annotation, and an inset's tick labels running into
+    the parent's, which is a collision between two axes rather than within one.
     """
-    boxes: list[tuple[str, Any]] = []
-    for artist in _visible_texts(figure):
-        # Tick labels have their own check, which knows they come in a row.
-        if getattr(artist, "_gu_is_tick", False):
+    from matplotlib.text import Text
+
+    entries: list[tuple[str, Any, int, bool]] = []
+    for axes in figure.get_axes():
+        if not axes.get_visible():
+            continue
+        owner = id(axes)
+        ticks = {id(t) for t in list(axes.get_xticklabels()) + list(axes.get_yticklabels())}
+        for artist in axes.findobj(Text):
+            if not artist.get_visible() or not (artist.get_text() or "").strip():
+                continue
+            try:
+                box = artist.get_window_extent(renderer)
+            except (ValueError, RuntimeError):
+                continue
+            if box.width <= 0 or box.height <= 0:
+                continue
+            entries.append((artist.get_text(), box, owner, id(artist) in ticks))
+
+    for text in figure.texts:
+        if not text.get_visible() or not (text.get_text() or "").strip():
             continue
         try:
-            box = artist.get_window_extent(renderer)
+            box = text.get_window_extent(renderer)
         except (ValueError, RuntimeError):
             continue
-        if box.width <= 0 or box.height <= 0:
-            continue
-        boxes.append((artist.get_text(), box))
+        entries.append((text.get_text(), box, 0, False))
 
-    ticks = set()
-    for axes in figure.get_axes():
-        for label in list(axes.get_xticklabels()) + list(axes.get_yticklabels()):
-            ticks.add(id(label))
-    boxes = [
-        (text, box)
-        for (text, box), artist in zip(boxes, [a for a in _visible_texts(figure)])
-        if id(artist) not in ticks
-    ]
-
-    for i in range(len(boxes)):
-        for j in range(i + 1, len(boxes)):
-            left, right = boxes[i], boxes[j]
-            if not _overlaps(left[1], right[1]):
+    for i in range(len(entries)):
+        for j in range(i + 1, len(entries)):
+            left_text, left_box, left_axes, left_tick = entries[i]
+            right_text, right_box, right_axes, right_tick = entries[j]
+            # Two tick labels on the same axes are the other check's business.
+            if left_tick and right_tick and left_axes == right_axes:
                 continue
-            overlap_w = min(left[1].x1, right[1].x1) - max(left[1].x0, right[1].x0)
-            overlap_h = min(left[1].y1, right[1].y1) - max(left[1].y0, right[1].y0)
-            smaller = min(left[1].width * left[1].height, right[1].width * right[1].height)
-            if smaller <= 0 or (overlap_w * overlap_h) / smaller < 0.12:
+            if not _overlaps(left_box, right_box):
                 continue
+            overlap = (min(left_box.x1, right_box.x1) - max(left_box.x0, right_box.x0)) * (
+                min(left_box.y1, right_box.y1) - max(left_box.y0, right_box.y0)
+            )
+            smaller = min(left_box.width * left_box.height, right_box.width * right_box.height)
+            if smaller <= 0 or overlap / smaller < 0.12:
+                continue
+            across = " (an inset over its parent)" if left_axes != right_axes else ""
             report.add(
                 "error",
                 "labels_collide",
-                f'"{left[0]}" and "{right[0]}" are drawn on top of each other.',
+                f'"{left_text}" and "{right_text}" are drawn on top of each other{across}.',
             )
             return
 
