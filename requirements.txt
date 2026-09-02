@@ -1,0 +1,4 @@
+# Only the generated scripts need these. The MCP server itself is TypeScript and
+# has no Python dependency.
+matplotlib>=3.9
+pandas>=2.0
