@@ -1,7 +1,7 @@
 ---
 id: 02
 slug: no-fabricated-uncertainty-band
-status: ready
+status: needs_rework
 priority: P0
 title: A group with fewer than two observations draws a zero-width band that reads as perfect agreement
 source_idea: report-sample-size.md
@@ -125,3 +125,36 @@ idea, which asked for a non-zero exit; see Evidence.
   observation; removing the band removes the misreading, and Cumming's Rule 3 asks that no
   bar be shown, not that the figure be refused. A non-zero exit on the author's own machine
   for data they may legitimately have is a cost with no remaining honesty benefit.
+
+## Rework required
+
+Audit returned NEEDS_REWORK. All seven acceptance criteria pass on their literal
+text and all seven checks are green. The failure is against the Change section,
+"emit one printed line", which no criterion tests.
+
+**The disclosure line prints more than once per figure.** `report_missing_interval`
+is called from inside `summarise()`, and the emitted script calls `summarise()`
+twice: once in `draw_panel` and again in `main` for alt text and claims. Running
+the fixture prints the identical line twice, back to back. Reproduced for ci/band,
+ci/bar, sem and std.
+
+Faceted is worse. `draw_panel` runs per panel, so the line prints once per panel
+with a panel-local denominator and no figure total. A 2-panel facet prints
+"3 of 6 points" twice when the figure has 6 of 12. A 6-panel facet prints six
+partial lines.
+
+Fix by hoisting the report to a single figure-level call, or by guarding it with a
+module-level flag. Either way the denominator must be the whole figure, not a
+panel.
+
+Criterion 2 asserted presence with `assert.match`, which passes on one print or
+five. **The test must assert the count, not the presence.** Add that.
+
+Nothing else changes. The auditor confirmed the rest is correct, including that
+NaN genuinely reaches all three drawing calls: it monkeypatched `fill_between`
+and `errorbar` and measured 5 NaN in both band bounds for the solo series, 10/10
+NaN in the line errorbar yerr, and 2 NaN in the bar chart error pair. It also
+proved every baseline figure was unchangeable rather than merely unchanged, by
+showing `examples/data/training.csv` has exactly 3 seeds in every (model, epoch)
+group, which makes the old `np.where` and the new bare `low` provably identical
+arrays.

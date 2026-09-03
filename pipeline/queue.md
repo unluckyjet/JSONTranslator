@@ -6,7 +6,7 @@ Open: 8. Shipped: 1.
 
 | id | pri | status | title | file |
 | --- | --- | --- | --- | --- |
-| 02 | P0 | ready | A group with fewer than two observations draws a zero-width band that reads as perfect agreement | `02-no-fabricated-uncertainty-band.md` |
+| 02 | P0 | needs_rework | A group with fewer than two observations draws a zero-width band that reads as perfect agreement | `02-no-fabricated-uncertainty-band.md` |
 | 03 | P0 | ready | A claim reports HOLDS from the means alone while every interval overlaps | `03-claims-must-clear-the-noise.md` |
 | 04 | P0 | ready | The table bolds a winner by idxmax alone, and its uncertainty field is dead code | `04-table-winner-must-clear-the-noise.md` |
 | 05 | P0 | ready | Every significance pair is tested against a flat alpha, so five categories buy ten chances at a star | `05-correct-for-multiple-comparisons.md` |
