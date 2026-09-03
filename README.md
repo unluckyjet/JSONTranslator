@@ -293,6 +293,86 @@ And it refuses a truncated bar axis outright, because a bar's length is its valu
 scheduled yet. `examples/README.md` covers the
 gallery and why its images are committed.
 
+
+## Seventh pass, thirteen more kinds
+
+Seven kinds in the morning, twenty-one by the evening. Each of these replaces a figure people
+already draw, and draw worse.
+
+| | |
+| --- | --- |
+| ![Empirical cumulative distributions of latency for three models](docs/seventh-pass-ecdf.png) | ![Raincloud plot with the violin, quartile box and every raw point](docs/seventh-pass-raincloud.png) |
+| ![Ridgeline plot, one latency density per model](docs/seventh-pass-ridgeline.png) | ![Forest plot of four ablation components with confidence intervals](docs/seventh-pass-forest.png) |
+
+*Distributions, and an ablation table with its intervals kept*
+
+The ECDF has no bin width and no bandwidth, so nothing about its shape is a decision an author
+makes. A histogram invents and destroys modes depending on where the bins land, and the step is
+drawn as a step because the distribution is flat between observations.
+
+The forest plot is the one I would keep if I could keep one. An ablation table is already a forest
+plot with the intervals thrown away. Here `+ EMA` crosses zero, which no amount of bolding in a
+table would have shown.
+
+| | |
+| --- | --- |
+| ![Paired differences between two conditions with a bootstrap interval](docs/seventh-pass-paired-difference.png) | ![Slope chart of four methods before and after](docs/seventh-pass-slope.png) |
+| ![Dumbbell chart, before and after per method on one scale](docs/seventh-pass-dumbbell.png) | ![Reliability diagram comparing two models against the diagonal](docs/seventh-pass-calibration.png) |
+
+*Differences, change, and whether the probabilities mean anything*
+
+The paired-difference plot draws the subtractions themselves. A paired test operates on those
+numbers, so they are the distribution the p-value described; two overlapping boxes next to a
+p-value are the commonest statistical mistake in papers. Its axis reads "Change in accuracy (pp)"
+rather than "Accuracy (%)", because 2.4 here is a gain and the difference between two percentages
+is measured in points.
+
+The reliability diagram prints the expected calibration error per model. The overconfident one
+scores 0.080 against 0.026 and sits below the diagonal all the way along.
+
+| | |
+| --- | --- |
+| ![Q-Q plot with a gaussian and a heavy-tailed sample](docs/seventh-pass-qq.png) | ![Kaplan-Meier curves for two arms with censoring marks](docs/seventh-pass-kaplan-meier.png) |
+| ![Scaling plot on log-log axes with fitted power laws](docs/seventh-pass-scaling-fit.png) | ![Row-normalised confusion matrix over four classes](docs/seventh-pass-confusion.png) |
+
+*Checking an assumption, surviving, scaling, and confusing*
+
+The Q-Q plot checks the distributional assumption before a claim rests on it. The heavy-tailed
+series bends away at both ends, and there is nothing else to read. Winitzki's approximation supplies the
+normal quantile, so this needs no scipy.
+
+The survival curve marks every censored record. A curve that hides them looks far more certain
+than the data supports.
+
+The scaling fit prints the exponent and its interval instead of leaving it to be read off a log-log
+axis by eye. On data generated with an exponent of 0.14 it recovered -0.1399 plus or minus 0.0023.
+
+A confusion matrix is no longer a heatmap, because it makes a claim a heatmap does not.
+`normalize` has no default. Row-normalised reads as recall, column-normalised as precision, and
+raw counts as support, and nothing used to make an author say which was on screen.
+
+| | |
+| --- | --- |
+| ![Waterfall chart of four ablation contributions from a baseline](docs/seventh-pass-waterfall.png) | ![Grid of twelve sparklines on one shared scale](docs/seventh-pass-sparklines.png) |
+
+*Contributions, and many series at once*
+
+A waterfall requires `category_order`, because a reader takes it left to right and the order is
+part of the claim. The sparkline grid shares one scale across every cell, since free limits would let a
+flat series look as dramatic as a real one.
+
+The waterfall also found a hole in the render checker. Its bars are meant to float, so only the
+first and the total touch the baseline, and the truncated-bar rule fired on it and told the author
+to do something that would have destroyed the chart. That rule now skips bars which do not share a
+starting edge.
+
+Four of these thirteen shipped with a bug that typechecked, ran, and wrote a valid PNG. The
+ridgeline drew with its axis labels swapped, reading "Model" over latency values. The confusion
+matrix tried to average a class label. The waterfall's baseline sat outside the view, because
+autoscale measures the bars and not the line they rise from. And four separate kinds crashed on a
+missing `HATCHES`, from being added to the emitter without being added to the list of kinds whose
+second channel is a dash. That list lives in one place now.
+
 ## The gallery, rebuilt and measured
 
 Fifteen figures, one per branch of the emitter. They used to be built by POSTing each spec to the
