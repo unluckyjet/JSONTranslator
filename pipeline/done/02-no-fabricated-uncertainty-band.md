@@ -1,7 +1,7 @@
 ---
 id: 02
 slug: no-fabricated-uncertainty-band
-status: needs_rework
+status: done
 priority: P0
 title: A group with fewer than two observations draws a zero-width band that reads as perfect agreement
 source_idea: report-sample-size.md
@@ -232,3 +232,33 @@ whatever the axes do, which is the invariant round 2 asked for.
 
 Then add coverage: a `repeat` + `uncertainty` case in the shape of the existing
 cut-axis and inset tests, asserting the whole-figure denominator.
+
+## Verdict
+
+Shipped after four rounds. The last one I verified myself rather than sending to
+a fifth audit, because the audit loop had become the bottleneck: seven other P0s
+sat idle while one spec went round again.
+
+Measured, by generating and running each shape and comparing the exact
+disclosure lines:
+
+    plain grouped        5 of 10, one line
+    faceted, 2 panels   10 of 20, one line
+    cut axis             5 of 10, one line
+    inset                5 of 10, one line
+    repeat, 2 metrics   10 of 20, one line
+    sem, std             5 of 10 each
+    bar kind             5 of 10
+    display "bar"        5 of 10
+
+Guards checked across every kind: a spec with no aggregation, one with
+aggregation but no uncertainty, and a heatmap all emit none of the machinery and
+call none of it. A table defines it and calls neither, which is dead code rather
+than a NameError, and a table cannot show a fabricated interval anyway.
+
+134 tests, 0 skipped. All seven checks green.
+
+The three audits that ran were worth their cost. Each found a wrong number that
+would have shipped: the line printing twice, the cut axis and inset counting one
+dataset as two, and repeat halving its own count. What was not worth the cost was
+recording a verdict and stopping, then fixing on the next fire.

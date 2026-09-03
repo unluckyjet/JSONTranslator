@@ -111,6 +111,39 @@ def bootstrap_interval(frame, keys):
     return np.array(lows), np.array(highs)
 
 
+PANEL_KEY = 0
+MISSING_INTERVALS = {}
+
+
+def note_missing_interval(summary):
+    # Keyed by panel, which is the only thing that tracks the points a reader
+    # sees. Not by axes: a cut axis draws one panel above and below the break,
+    # and an inset redraws its parent magnified, so both must count once. Not
+    # by frame either: repeat hands every panel the same frame with a
+    # different y field, so frame identity collapses them.
+    if "_low" not in summary or PANEL_KEY in MISSING_INTERVALS:
+        return
+    missing = ~np.isfinite(summary["_low"].to_numpy(dtype=float))
+    names = set()
+    if GROUP is not None and missing.any():
+        names = {str(value) for value in summary.loc[missing, GROUP]}
+    MISSING_INTERVALS[PANEL_KEY] = (int(missing.sum()), len(summary), names)
+
+
+def report_missing_interval():
+    counted = list(MISSING_INTERVALS.values())
+    missing = sum(count for count, _, _ in counted)
+    if missing == 0:
+        return
+    total = sum(size for _, size, _ in counted)
+    names = sorted(set().union(*(seen for _, _, seen in counted)))
+    detail = f" (series: {', '.join(names)})" if names else ""
+    print(
+        f"uncertainty: {missing} of {total} points have fewer than 2 "
+        f"observations, so no interval is drawn for them{detail}"
+    )
+
+
 def summarise(frame):
     keys = [X_FIELD] + ([GROUP] if GROUP is not None else [])
     # sort=False keeps the file's category order instead of an alphabetical one.
@@ -119,8 +152,8 @@ def summarise(frame):
     spread = frame.groupby(keys, sort=False)[Y_FIELD]
     centre = summary[Y_FIELD].to_numpy(dtype=float)
     low, high = bootstrap_interval(frame, keys)
-    summary["_low"] = np.where(np.isfinite(low), low, centre)
-    summary["_high"] = np.where(np.isfinite(high), high, centre)
+    summary["_low"] = low
+    summary["_high"] = high
     return summary
 
 
@@ -251,6 +284,7 @@ def series_style(name, index, total):
 
 def draw_panel(ax, df):
     frame = summarise(df)
+    note_missing_interval(frame)
     names = series_names(frame)
     for index, name in enumerate(names):
         block = frame[frame[GROUP] == name]
@@ -517,6 +551,7 @@ def main():
         flat = list(axes.flat)
         for index, (name, block) in enumerate(blocks):
             ax = flat[index]
+            globals()["PANEL_KEY"] = index
 
             draw_panel(ax, block)
 
@@ -554,6 +589,7 @@ def main():
     plt.close(fig)
 
 
+    report_missing_interval()
     print(DISCLOSURE)
     print(f"data sha256:{DATA_HASH}")
     if not claims_hold:

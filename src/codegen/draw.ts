@@ -1,6 +1,7 @@
 import type { FigureSpec, PlottedSpec } from "../schema.ts";
 import { pyStr } from "./py.ts";
 import { BAND_ALPHA, PRESETS, RAW_ALPHA } from "./theme.ts";
+import { needsMissingIntervalReport } from "./data.ts";
 
 /**
  * One `draw_panel` function per chart kind.
@@ -101,6 +102,7 @@ function emitLine(spec: FigureSpec & { kind: "line" }, out: string[]): void {
   const band = spec.uncertainty?.display === "band";
 
   out.push("", "def draw_panel(ax, df):", "    frame = summarise(df)");
+  if (needsMissingIntervalReport(spec)) out.push("    note_missing_interval(frame)");
 
   const plot = (indentLevel: string, source: string, styleExpr: string, label: string) => {
     const lines: string[] = [];
@@ -252,6 +254,7 @@ function emitBar(spec: FigureSpec & { kind: "bar" }, out: string[]): void {
     "",
     "def draw_panel(ax, df):",
     "    frame = summarise(df)",
+    ...(needsMissingIntervalReport(spec) ? ["    note_missing_interval(frame)"] : []),
     "    categories = category_order(frame)",
     "    positions = np.arange(len(categories))",
   );

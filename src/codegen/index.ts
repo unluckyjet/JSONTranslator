@@ -3,7 +3,15 @@ import { hasCategoricalX, type FigureSpec } from "../schema.ts";
 import { emitAltText } from "../alttext.ts";
 import { emitClaimTests, CLAIM_WORDING } from "../claims.ts";
 import { emitAnimation } from "./animate.ts";
-import { emitBootstrap, emitLoad, emitPrepare, emitSmooth, emitSummarise } from "./data.ts";
+import {
+  emitBootstrap,
+  emitLoad,
+  emitMissingIntervalReport,
+  needsMissingIntervalReport,
+  emitPrepare,
+  emitSmooth,
+  emitSummarise,
+} from "./data.ts";
 import { emitDecoratePanel, emitHelpers, emitLegend } from "./decorate.ts";
 import {
   emitAxisBreak,
@@ -352,6 +360,7 @@ function emitMain(spec: FigureSpec, out: string[]): void {
     "        flat = list(axes.flat)",
     "        for index, (name, block) in enumerate(blocks):",
     "            ax = flat[index]",
+    ...(needsMissingIntervalReport(spec) ? ['            globals()["PANEL_KEY"] = index'] : []),
     spec.repeat
       ? '            globals()["Y_FIELD"] = name'
       : "",
@@ -441,6 +450,7 @@ function emitSaveBlock(spec: FigureSpec, out: string[]): void {
     spec.output.interactive
       ? "    write_interactive(df)"
       : "",
+    needsMissingIntervalReport(spec) ? "    report_missing_interval()" : "",
     "    print(DISCLOSURE)",
     '    print(f"data sha256:{DATA_HASH}")',
     "    if not claims_hold:",
@@ -458,6 +468,7 @@ export function emitPython(spec: FigureSpec): string {
   emitLoad(spec, out);
   emitPrepare(spec, out);
   emitBootstrap(spec, out);
+  emitMissingIntervalReport(spec, out);
   emitSummarise(spec, out);
   emitSmooth(spec, out);
   emitHelpers(spec, out);

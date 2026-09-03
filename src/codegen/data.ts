@@ -186,12 +186,75 @@ export function emitSummarise(spec: FigureSpec, out: string[]): void {
     }
   }
 
+  // Keep the NaN. Substituting the centre turned "no interval could be
+  // measured" into "the interval is exactly zero", which draws a band pinched
+  // to a hairline and reads as perfect agreement across seeds.
   out.push(
-    '    summary["_low"] = np.where(np.isfinite(low), low, centre)',
-    '    summary["_high"] = np.where(np.isfinite(high), high, centre)',
+    '    summary["_low"] = low',
+    '    summary["_high"] = high',
     "    return summary",
     "",
   );
+}
+
+/**
+ * The line that says a band is absent because nothing was measurable.
+ *
+ * Cumming, Fidler and Vaux put it as a rule: error bars are for independently
+ * repeated experiments, never for replicates. A group of one was not repeated,
+ * so it gets no bar and the reader gets told why.
+ *
+ * Counting and printing are separate because the count belongs to the figure
+ * and the summary belongs to a panel. Each panel notes what it drew, and main
+ * prints one line at the end. Reporting from inside summarise() printed twice
+ * on a plain figure, since main summarises again for the alt text, and once per
+ * panel with a panel-local denominator on a faceted one.
+ */
+export function emitMissingIntervalReport(spec: FigureSpec, out: string[]): void {
+  if (!needsMissingIntervalReport(spec)) return;
+
+  out.push(
+    "",
+    "PANEL_KEY = 0",
+    "MISSING_INTERVALS = {}",
+    "",
+    "",
+    "def note_missing_interval(summary):",
+    "    # Keyed by panel, which is the only thing that tracks the points a reader",
+    "    # sees. Not by axes: a cut axis draws one panel above and below the break,",
+    "    # and an inset redraws its parent magnified, so both must count once. Not",
+    "    # by frame either: repeat hands every panel the same frame with a",
+    "    # different y field, so frame identity collapses them.",
+    '    if "_low" not in summary or PANEL_KEY in MISSING_INTERVALS:',
+    "        return",
+    '    missing = ~np.isfinite(summary["_low"].to_numpy(dtype=float))',
+    "    names = set()",
+    "    if GROUP is not None and missing.any():",
+    "        names = {str(value) for value in summary.loc[missing, GROUP]}",
+    "    MISSING_INTERVALS[PANEL_KEY] = (int(missing.sum()), len(summary), names)",
+    "",
+    "",
+    "def report_missing_interval():",
+    "    counted = list(MISSING_INTERVALS.values())",
+    "    missing = sum(count for count, _, _ in counted)",
+    "    if missing == 0:",
+    "        return",
+    "    total = sum(size for _, size, _ in counted)",
+    "    names = sorted(set().union(*(seen for _, _, seen in counted)))",
+    "    detail = f\" (series: {', '.join(names)})\" if names else \"\"",
+    "    print(",
+    '        f"uncertainty: {missing} of {total} points have fewer than 2 "',
+    '        f"observations, so no interval is drawn for them{detail}"',
+    "    )",
+    "",
+  );
+}
+
+/** Whether the script collapses repeats and measures their spread at all. */
+export function needsMissingIntervalReport(spec: FigureSpec): boolean {
+  const aggregation = "aggregation" in spec ? spec.aggregation : "none";
+  if (aggregation === "none") return false;
+  return "uncertainty" in spec && Boolean(spec.uncertainty);
 }
 
 export function emitBootstrap(spec: FigureSpec, out: string[]): void {

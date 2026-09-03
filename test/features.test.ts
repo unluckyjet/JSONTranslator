@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RECIPES } from "../src/recipes.ts";
@@ -9,6 +9,13 @@ import { FigureSpec } from "../src/schema.ts";
 import { translate } from "../src/translate.ts";
 import { verify } from "../src/verify.ts";
 import { resolvePython } from "../scripts/python.ts";
+
+const python = resolvePython();
+
+/** A committed CSV, resolved from this file rather than the caller's cwd. */
+function fixture(name: string): URL {
+  return new URL(`fixtures/${name}`, import.meta.url);
+}
 
 const line = {
   kind: "line",
@@ -307,7 +314,6 @@ test("output is deterministic across every recipe", () => {
 });
 
 test("every recipe compiles as Python", (t) => {
-  const python = resolvePython();
   if (!python) {
     t.skip("no Python interpreter found");
     return;
@@ -420,4 +426,151 @@ test("the cut-axis finding carries no patch", () => {
   const finding = found.find((f) => f.code === "axis_break_on_length_marks");
   assert.ok(finding);
   assert.ok(!("fix" in finding), "the finding offers a patch");
+});
+
+// --- a band is not drawn where no spread could be measured ---------------
+
+const solo = {
+  kind: "line",
+  x: { field: "epoch", label: "Training epoch" },
+  y: { field: "accuracy", label: "Test accuracy", unit: "%" },
+  group: "model",
+  aggregation: "mean",
+  uncertainty: { kind: "ci", over: "seed" },
+  data: { path: "single-seed.csv" },
+};
+
+test("the centre is never substituted for an interval that could not be measured", () => {
+  const code = translated(solo).code;
+  assert.ok(!code.includes("np.where(np.isfinite(low), low, centre)"));
+  assert.ok(code.includes('summary["_low"] = low'));
+});
+
+function runSolo(spec: unknown, driver?: string, csv = "single-seed.csv"): string {
+  const dir = mkdtempSync(join(tmpdir(), "gu-solo-"));
+  writeFileSync(join(dir, csv), readFileSync(fixture(csv)));
+  writeFileSync(join(dir, "figure.py"), translated(spec).code);
+  if (driver) writeFileSync(join(dir, "driver.py"), driver);
+  return execFileSync(python!, [driver ? "driver.py" : "figure.py"], {
+    cwd: dir,
+    encoding: "utf8",
+    stdio: "pipe",
+  });
+}
+
+function disclosures(out: string): string[] {
+  return out.split(/\r?\n/).filter((line) => line.startsWith("uncertainty:"));
+}
+
+test("a series with one observation per x is reported once, and the script still exits 0", { skip: !python }, () => {
+  // Once. summarise() runs per panel and again in main for the alt text, so
+  // reporting from inside it said the same thing twice.
+  const out = runSolo({ ...solo, output: { stem: "solo", formats: ["png"], dpi: 100 } });
+  assert.deepEqual(disclosures(out), [
+    "uncertainty: 5 of 10 points have fewer than 2 observations, so no interval is drawn for them (series: solo)",
+  ]);
+});
+
+test("a faceted figure counts every panel into one line", { skip: !python }, () => {
+  // Not "5 of 10" twice. The denominator is the figure, not a panel.
+  const out = runSolo(
+    {
+      ...solo,
+      facet: { by: "dataset", columns: 2 },
+      data: { path: "faceted-single-seed.csv" },
+      output: { stem: "solo-facet", formats: ["png"], dpi: 100, size: "double_column" },
+    },
+    undefined,
+    "faceted-single-seed.csv",
+  );
+  assert.deepEqual(disclosures(out), [
+    "uncertainty: 10 of 20 points have fewer than 2 observations, so no interval is drawn for them (series: solo)",
+  ]);
+});
+
+test("the unmeasurable rows keep NaN and the measurable ones do not", { skip: !python }, () => {
+  const driver = [
+    "import importlib.util, numpy as np, pandas as pd",
+    'spec = importlib.util.spec_from_file_location("figure", "figure.py")',
+    "mod = importlib.util.module_from_spec(spec)",
+    "spec.loader.exec_module(mod)",
+    'frame = mod.prepare(pd.read_csv("single-seed.csv"))',
+    "summary = mod.summarise(frame)",
+    'lows = summary.set_index("model")["_low"]',
+    'assert not np.isfinite(lows.loc["solo"]).any(), "solo invented an interval"',
+    'assert np.isfinite(lows.loc["repeated"]).all(), "repeated lost its interval"',
+    'print("nan-discipline ok")',
+  ].join("\n");
+  assert.match(runSolo({ ...solo, output: { stem: "solo", formats: ["png"] } }, driver), /nan-discipline ok/);
+});
+
+test("an errorbar display tolerates the missing interval", { skip: !python }, () => {
+  const out = runSolo({
+    ...solo,
+    uncertainty: { kind: "ci", over: "seed", display: "bar" },
+    output: { stem: "solo-bar", formats: ["png"], dpi: 100 },
+  });
+  assert.match(out, /uncertainty: 5 of 10 points/);
+});
+
+// The count must follow the data, not the number of axes the figure uses.
+// A cut axis draws the frame above and below the break; an inset redraws its
+// parent's frame magnified. Both are one set of points.
+const ONE_LINE = [
+  "uncertainty: 5 of 10 points have fewer than 2 observations, so no interval is drawn for them (series: solo)",
+];
+
+test("a cut axis counts its data once, not once per half", { skip: !python }, () => {
+  const out = runSolo({
+    ...solo,
+    axis_break: { axis: "y", from: 74, to: 76 },
+    output: { stem: "solo-break", formats: ["png"], dpi: 100 },
+  });
+  assert.deepEqual(disclosures(out), ONE_LINE);
+});
+
+test("an inset counts its data once, not once with its parent", { skip: !python }, () => {
+  const out = runSolo({
+    ...solo,
+    inset: { x: [3, 5], y: [70, 80], corner: "lower_right" },
+    output: { stem: "solo-inset", formats: ["png"], dpi: 100 },
+  });
+  assert.deepEqual(disclosures(out), ONE_LINE);
+});
+
+test("the count holds for every uncertainty kind that can go unmeasurable", { skip: !python }, () => {
+  // ci, sem and std all reach the same isfinite test. range and iqr do not,
+  // because min and max of one observation are finite and equal.
+  for (const kind of ["ci", "sem", "std"]) {
+    const out = runSolo({
+      ...solo,
+      uncertainty: { kind, over: "seed" },
+      output: { stem: `solo-${kind}`, formats: ["png"], dpi: 100 },
+    });
+    assert.deepEqual(disclosures(out), ONE_LINE, `${kind} miscounted`);
+  }
+});
+
+test("a bar chart reports the same way a line does", { skip: !python }, () => {
+  const out = runSolo({
+    ...solo,
+    kind: "bar",
+    x: { field: "epoch", label: "Training epoch" },
+    output: { stem: "solo-bar-kind", formats: ["png"], dpi: 100 },
+  });
+  assert.deepEqual(disclosures(out), ONE_LINE);
+});
+
+test("repeat counts every metric panel, though they share one frame", { skip: !python }, () => {
+  // repeat splits columns rather than rows, so every panel is handed the same
+  // DataFrame. Keying on the frame collapsed two panels into one and halved
+  // the count.
+  const out = runSolo({
+    ...solo,
+    repeat: { fields: ["accuracy", "loss"], columns: 2 },
+    output: { stem: "solo-repeat", formats: ["png"], dpi: 100, size: "double_column" },
+  });
+  assert.deepEqual(disclosures(out), [
+    "uncertainty: 10 of 20 points have fewer than 2 observations, so no interval is drawn for them (series: solo)",
+  ]);
 });
