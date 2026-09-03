@@ -13,7 +13,9 @@ import { join } from "node:path";
 
 type Spec = { id: string; slug: string; status: string; priority: string; title: string; file: string };
 
-const ORDER = ["needs_rework", "ready", "in_progress", "blocked"];
+// in_progress sits with needs_rework because both are the active item. It
+// sorted below P2 before, which put the spec being worked at the bottom.
+const ORDER = ["needs_rework", "in_progress", "ready", "blocked"];
 const RANK = ["P0", "P1", "P2"];
 
 function parse(dir: string, name: string): Spec | undefined {

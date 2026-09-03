@@ -202,3 +202,33 @@ the disclosure is silent exactly there, because min, max and both quartiles of
 one observation are finite and equal rather than NaN, so the isfinite test
 counts zero. Already filed as range-and-iqr-still-fabricate-a-band; the auditor
 reached it independently.
+
+## Rework required, round 3
+
+All four round-2 items are fixed and measured fixed. The cut axis and the inset
+both report 5 of 10 where they said 10 of 20. The fixtures are staged. The count
+assertion now covers ci, sem, std and the bar kind, all reproduced independently.
+All seven criteria hold and all seven checks are green.
+
+**One case of the same class remains, and it is the mechanism's fault.**
+`repeated_panels` returns `[(field, df) for field in REPEAT_FIELDS]`, the same
+DataFrame object for every panel, because repeat splits columns rather than rows.
+Keying on `id(source)` therefore collapses N metric panels into one. Measured on
+`repeat: {fields: ["accuracy", "loss"]}` over a single-seed CSV: the figure draws
+20 points with 10 unmeasurable and the line says 5 of 10. The series list is
+panel-one-only too, so a series unmeasurable on the second metric alone vanishes
+from the message.
+
+The auditor enumerated the four places a frame reaches `draw_panel` (the panel
+loop, the inset, and both halves of the break) and this is the only remaining
+one, so the class is closed rather than open.
+
+**Key on the panel, not on the frame.** Frame identity was the wrong choice: it
+happens to work for the cut axis and the inset and happens to fail for repeat.
+The panel loop already carries `index`, and the axis-break branch is a single
+panel that never enters the loop. Setting a module-level panel key beside the
+existing `globals()["Y_FIELD"] = name` and keying on that counts once per panel
+whatever the axes do, which is the invariant round 2 asked for.
+
+Then add coverage: a `repeat` + `uncertainty` case in the shape of the existing
+cut-axis and inset tests, asserting the whole-figure denominator.
