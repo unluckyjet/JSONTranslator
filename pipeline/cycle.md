@@ -7,9 +7,17 @@ cycle". A cycle does one spec and exits. It never starts a second one.
 ## 0. Orient
 
     npm run queue
+    git status --porcelain
 
 Prints the open count and the next item. If the rules are not already in
 context, read `pipeline/task_plan.md` before deciding anything.
+
+**A dirty tree means an audit is in flight. Stop.** The code auditor judges by
+`git diff`, so a second spec's edits landing in the same working tree would be
+read as scope creep on the first, and a PASS would commit half-finished work
+alongside it. Write nothing at all, not even the log line, because a file
+appearing mid-review is exactly what the auditor is told to flag. Log both
+cycles once the verdict lands.
 
 ## 1. Refill if the queue is thin
 
@@ -18,7 +26,10 @@ it. This cycle builds from what is already in the queue; the ideas land in time
 for the next one. That is the whole pipelining trick, and it is why nothing here
 needs an always-on process.
 
-Files sitting in `ideas/inbox/`, run the auditor over them first.
+Files sitting in `ideas/inbox/`, run the auditor over them first. Tell it to skip
+anything already named in a spec's `source_idea`, in `specs/` or in `done/`.
+Survivors stay in the inbox after they are turned into specs, so a later pass
+will re-judge work it already approved unless it is told not to.
 
 ## 2. Take the top spec
 
