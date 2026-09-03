@@ -98,6 +98,21 @@ for (const family of ["dense", "sparse"]) {
 }
 write("scaling.csv", scaling);
 
+// Enough observations per model that a density and an ECDF have something to
+// describe, and three spreads so the shapes differ.
+const latency = ["model,seed,latency_ms"];
+for (const [model, centre, spread] of [
+  ["baseline", 40, 9],
+  ["ours", 28, 4],
+  ["distilled", 33, 14],
+] as const) {
+  for (let seed = 0; seed < 60; seed += 1) {
+    const draw = centre + spread * (next() + next() + next() - 1.5);
+    latency.push(`${model},${seed},${Math.max(1, draw).toFixed(3)}`);
+  }
+}
+write("latency.csv", latency);
+
 let failures = 0;
 console.log(`python: ${python}\nworkdir: ${dir}\n`);
 

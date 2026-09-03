@@ -25,6 +25,9 @@ const KIND_PHRASING: Record<FigureSpec["kind"], string> = {
   bar: "Bar chart",
   box: "Box plot",
   violin: "Violin plot",
+  ecdf: "Empirical cumulative distribution",
+  raincloud: "Raincloud plot, showing the distribution, its quartiles and every observation",
+  ridgeline: "Ridgeline plot, one distribution per row",
   heatmap: "Heatmap",
   table: "Table",
 };
@@ -111,7 +114,7 @@ export function encodingSentence(spec: FigureSpec): string {
  * The emitted function returns a sentence, not a paragraph.
  */
 export function emitAltText(spec: FigureSpec, out: string[]): void {
-  const grouped = Boolean(spec.group) && spec.kind !== "heatmap";
+  const grouped = Boolean(spec.group) && spec.kind !== "heatmap" && spec.kind !== "ecdf";
 
   out.push(
     "",
@@ -120,7 +123,24 @@ export function emitAltText(spec: FigureSpec, out: string[]): void {
     "    parts = []",
   );
 
-  if (spec.kind === "heatmap") {
+  if (spec.kind === "ecdf") {
+    // The vertical axis is a proportion the script computed, so there is
+    // nothing to summarise there. What a reader wants is where each
+    // distribution sits, which is the median and the quartile spread.
+    out.push(
+      "    for name in (series_names(frame) if GROUP is not None else [None]):",
+      "        block = frame if name is None else frame[frame[GROUP] == name]",
+      "        values = block[X_FIELD].dropna().to_numpy(dtype=float)",
+      "        if not len(values):",
+      "            continue",
+      "        low, mid, high = np.percentile(values, [25, 50, 75])",
+      "        who = \"the distribution\" if name is None else str(name)",
+      '        parts.append(',
+      '            f"{who} has a median of {mid:.3g} with the middle half between "',
+      '            f"{low:.3g} and {high:.3g} over {len(values)} observations"',
+      "        )",
+    );
+  } else if (spec.kind === "heatmap") {
     out.push(
       "    values = frame[VALUE_FIELD].dropna()",
       "    if len(values):",

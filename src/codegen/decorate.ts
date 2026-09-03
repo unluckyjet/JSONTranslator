@@ -13,12 +13,18 @@ function axisLabel(axis: AxisSpec): string {
   return axis.unit ? `${axis.label} (${axis.unit})` : axis.label;
 }
 
-/** A horizontal bar draws the category up the vertical axis, swapping the two. */
+/**
+ * Which plot axis a spec axis lands on.
+ *
+ * Two kinds swap them. A horizontal bar lists categories up the vertical axis,
+ * and a ridgeline stacks one density per category down the page with the
+ * measured value running across. Both are presentation decisions the generator
+ * owns, and both will label the wrong axis if this mapping forgets them.
+ */
 function plotAxis(spec: FigureSpec, specAxis: "x" | "y"): "x" | "y" {
-  if (spec.kind === "bar" && spec.orientation === "horizontal") {
-    return specAxis === "x" ? "y" : "x";
-  }
-  return specAxis;
+  const swapped =
+    (spec.kind === "bar" && spec.orientation === "horizontal") || spec.kind === "ridgeline";
+  return swapped ? (specAxis === "x" ? "y" : "x") : specAxis;
 }
 
 function isCategorical(spec: FigureSpec, specAxis: "x" | "y"): boolean {

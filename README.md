@@ -27,7 +27,7 @@ vermillion land 0.07 apart in relative luminance, under the 0.10 a reader needs.
 palette does not save it. Of all 40,320 orderings the best still leaves four series 0.094 apart.
 Hatching does save it, at any number of series.
 
-Seven kinds: line, scatter, bar, box, violin, heatmap and table. Panels, layers, insets and cut
+Ten kinds: line, scatter, bar, box, violin, ecdf, raincloud, ridgeline, heatmap and table. Panels, layers, insets and cut
 axes compose them. Venue presets set the column width and the font floor from the real submission
 guides, so a figure is measured against the width it will actually be printed at.
 
@@ -244,7 +244,7 @@ because the agent literature reports models recognising an error and failing to 
 an interface problem rather than a reasoning one. The loop has a budget so it says what it could not
 fix instead of churning.
 
-`list_recipes` has eleven known-good specs to start from. `validate_spec` checks one without
+`list_recipes` has fourteen known-good specs to start from. `validate_spec` checks one without
 generating anything, and `score_spec` costs one so two can be compared.
 
 ## Connecting

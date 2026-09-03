@@ -114,7 +114,9 @@ function emitPreamble(spec: FigureSpec, out: string[]): void {
   out.push(`PANEL_LETTER_PT = ${preset.panel_letter_pt}`);
   out.push(`SECOND_CHANNEL_THRESHOLD = ${SECOND_CHANNEL_THRESHOLD}`);
   if (spec.kind === "scatter") out.push(`MARKERS = ${pyList(MARKERS)}`);
-  else if (spec.kind === "line") out.push(`LINE_STYLES = ${pyList(LINE_STYLES)}`);
+  else if (spec.kind === "line" || spec.kind === "ecdf") {
+    out.push(`LINE_STYLES = ${pyList(LINE_STYLES)}`);
+  }
   else if (spec.kind === "bar") out.push(`HATCHES = ${pyList(HATCHES)}`);
   out.push("");
 
@@ -153,7 +155,10 @@ function emitPreamble(spec: FigureSpec, out: string[]): void {
     out.push(`Y2_LABEL = ${pyStr(label)}`);
     out.push(`Y2_JUSTIFICATION = ${pyStr(spec.y2.justification)}`);
   }
-  if (spec.kind === "box" || spec.kind === "violin") out.push("POINT_JITTER_SEED = 20260902");
+  if (spec.kind === "box" || spec.kind === "violin" || spec.kind === "raincloud") {
+    out.push("POINT_JITTER_SEED = 20260902");
+  }
+  if (spec.kind === "ecdf") out.push(`COMPLEMENTARY = ${spec.complementary ? "True" : "False"}`);
   if ("uncertainty" in spec && spec.uncertainty) {
     out.push(`CI_LEVEL = ${spec.uncertainty.level}`);
     out.push("BOOTSTRAP_SEED = 20260902");

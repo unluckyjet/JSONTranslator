@@ -402,6 +402,27 @@ export const ViolinSpec = z.object({
   category_order: z.array(z.string().min(1)).min(1).optional(),
 });
 
+export const EcdfSpec = z.object({
+  ...xy,
+  kind: z.literal("ecdf"),
+  complementary: z
+    .boolean()
+    .default(false)
+    .describe("Draw 1 - F(x) instead, when the tail is what the argument rests on."),
+});
+
+export const RaincloudSpec = z.object({
+  ...xy,
+  kind: z.literal("raincloud"),
+  category_order: z.array(z.string().min(1)).min(1).optional(),
+});
+
+export const RidgelineSpec = z.object({
+  ...xy,
+  kind: z.literal("ridgeline"),
+  category_order: z.array(z.string().min(1)).min(1).optional(),
+});
+
 export const HeatmapSpec = z.object({
   ...base,
   kind: z.literal("heatmap"),
@@ -446,6 +467,9 @@ export const FigureSpec = z.discriminatedUnion("kind", [
   BarSpec,
   BoxSpec,
   ViolinSpec,
+  EcdfSpec,
+  RaincloudSpec,
+  RidgelineSpec,
   HeatmapSpec,
   TableSpec,
 ]);
@@ -458,13 +482,22 @@ export const FIGURE_KINDS = [
   "bar",
   "box",
   "violin",
+  "ecdf",
+  "raincloud",
+  "ridgeline",
   "heatmap",
   "table",
 ] as const;
 
 /** Kinds whose x is a category on an index rather than a number. */
 export function hasCategoricalX(spec: FigureSpec): boolean {
-  return spec.kind === "bar" || spec.kind === "box" || spec.kind === "violin";
+  return (
+    spec.kind === "bar" ||
+    spec.kind === "box" ||
+    spec.kind === "violin" ||
+    spec.kind === "raincloud" ||
+    spec.kind === "ridgeline"
+  );
 }
 
 /** Kinds that draw one mark per series rather than a distribution. */

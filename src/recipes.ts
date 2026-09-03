@@ -18,6 +18,40 @@ export type Recipe = {
 
 export const RECIPES: Recipe[] = [
   {
+    name: "latency_ecdf",
+    purpose:
+      "Compare whole latency distributions without choosing a bin width. Every observation is on the page and the tail is readable.",
+    spec: {
+      kind: "ecdf",
+      x: { field: "latency_ms", label: "Latency", unit: "ms" },
+      y: { field: "proportion", label: "Proportion of runs" },
+      group: "model",
+      data: { path: "latency.csv" },
+    },
+  },
+  {
+    name: "raincloud_by_model",
+    purpose:
+      "The distribution, its quartiles and every raw observation together, so a claim resting on six runs cannot hide inside a smooth curve.",
+    spec: {
+      kind: "raincloud",
+      x: { field: "model", label: "Model" },
+      y: { field: "latency_ms", label: "Latency", unit: "ms" },
+      data: { path: "latency.csv" },
+    },
+  },
+  {
+    name: "ridgeline_by_model",
+    purpose: "One density per category down the page, for comparing many distributions at once.",
+    spec: {
+      kind: "ridgeline",
+      x: { field: "model", label: "Model" },
+      y: { field: "latency_ms", label: "Latency", unit: "ms" },
+      data: { path: "latency.csv" },
+    },
+  },
+
+  {
     name: "training_curve",
     purpose:
       "Accuracy or loss over epochs for several models, averaged across seeds with a confidence band.",

@@ -75,7 +75,16 @@ export function primaryChannel(spec: FigureSpec): Channel {
       return spec.stacked ? "length" : "position_common";
     case "box":
     case "violin":
+    case "raincloud":
       return "position_common";
+    case "ecdf":
+      // Both axes are position, and the cumulative axis needs no bin choice,
+      // so nothing about the encoding is left to an author's discretion.
+      return "position_common";
+    case "ridgeline":
+      // Rows share a baseline only with their own neighbour, so a reader
+      // compares along an unaligned scale.
+      return "position_nonaligned";
     case "heatmap":
       return "shading";
     case "table":

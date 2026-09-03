@@ -143,10 +143,10 @@ const fieldReferences: Rule = (spec, add) => {
   if (!columns) return;
 
   const known = new Set(columns);
-  const refs: [string, string][] = [
-    ["x.field", spec.x.field],
-    ["y.field", spec.y.field],
-  ];
+  const refs: [string, string][] = [["x.field", spec.x.field]];
+  // An ECDF's vertical axis is the cumulative proportion, which the script
+  // computes. y.field names no column and y.label is what the reader sees.
+  if (spec.kind !== "ecdf") refs.push(["y.field", spec.y.field]);
   if (spec.group) refs.push(["group", spec.group]);
   if (spec.facet) refs.push(["facet.by", spec.facet.by]);
   if (spec.kind === "heatmap") refs.push(["value", spec.value]);

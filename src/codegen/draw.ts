@@ -1,4 +1,4 @@
-import type { FigureSpec, PlottedSpec } from "../schema.ts";
+import { hasCategoricalX, type FigureSpec, type PlottedSpec } from "../schema.ts";
 import { pyStr } from "./py.ts";
 import { BAND_ALPHA, PRESETS, RAW_ALPHA } from "./theme.ts";
 import { needsMissingIntervalReport } from "./data.ts";
@@ -18,10 +18,10 @@ export function emitSeriesHelpers(spec: FigureSpec, out: string[]): void {
   const scatter = spec.kind === "scatter";
   const sizes = scatter ? preset.marker : preset.line;
   const key = scatter ? "size" : "width";
-  const channelConst =
-    scatter ? "MARKERS" : spec.kind === "line" ? "LINE_STYLES" : "HATCHES";
-  const channelKey = scatter ? "marker" : spec.kind === "line" ? "linestyle" : "hatch";
-  const plain = scatter ? pyStr("o") : spec.kind === "line" ? pyStr("-") : pyStr("");
+  const dashed = spec.kind === "line" || spec.kind === "ecdf";
+  const channelConst = scatter ? "MARKERS" : dashed ? "LINE_STYLES" : "HATCHES";
+  const channelKey = scatter ? "marker" : dashed ? "linestyle" : "hatch";
+  const plain = scatter ? pyStr("o") : dashed ? pyStr("-") : pyStr("");
 
   out.push(
     "",
@@ -424,6 +424,163 @@ function emitDistribution(spec: FigureSpec & { kind: "box" | "violin" }, out: st
   );
 }
 
+function emitEcdf(spec: FigureSpec & { kind: "ecdf" }, out: string[]): void {
+  // A step function through every observation. No bin width and no bandwidth,
+  // so nothing about the shape is an author's choice: a histogram invents and
+  // destroys modes depending on where the bins land.
+  const value = spec.complementary
+    ? "1.0 - np.arange(1, len(values) + 1) / len(values)"
+    : "np.arange(1, len(values) + 1) / len(values)";
+  out.push(
+    "",
+    "def draw_panel(ax, df):",
+    "    names = series_names(df) if GROUP is not None else [None]",
+    "    for index, name in enumerate(names):",
+    "        block = df if name is None else df[df[GROUP] == name]",
+    "        values = np.sort(block[X_FIELD].dropna().to_numpy(dtype=float))",
+    "        if not len(values):",
+    "            continue",
+    `        proportion = ${value}`,
+    "        style = series_style(name, index, len(names))",
+    "        # A step, not a line. The distribution is flat between observations,",
+    "        # and joining them with a slope claims data that was never seen.",
+    "        ax.step(",
+    "            np.concatenate([values[:1], values]),",
+    "            np.concatenate([[1.0 if COMPLEMENTARY else 0.0], proportion]),",
+    '            where="post",',
+    "            label=None if name is None else str(name),",
+    '            color=style["colour"],',
+    '            linewidth=style["width"],',
+    '            alpha=style["alpha"],',
+    '            zorder=style["zorder"],',
+    '            linestyle=style["linestyle"],',
+    "        )",
+    "    ax.set_ylim(-0.02, 1.02)",
+    "",
+  );
+}
+
+function emitRaincloud(spec: FigureSpec & { kind: "raincloud" }, out: string[]): void {
+  void spec;
+  // Half a violin, a quartile box and every raw point. The cloud shows the
+  // shape, the box shows the summary a reader expects, and the rain is the
+  // evidence for both, so a claim resting on six observations cannot hide
+  // inside a smooth curve.
+  out.push(
+    "",
+    "def draw_panel(ax, df):",
+    "    categories = category_order(df)",
+    "    groups = [df[df[X_FIELD] == c][Y_FIELD].dropna().to_numpy(dtype=float) for c in categories]",
+    "    groups = [g if len(g) else np.array([np.nan]) for g in groups]",
+    "    positions = np.arange(len(categories))",
+    "    parts = ax.violinplot(",
+    "        groups,",
+    "        positions=positions + 0.08,",
+    "        showmedians=False,",
+    "        showextrema=False,",
+    "        widths=0.55,",
+    "    )",
+    '    for index, body in enumerate(parts["bodies"]):',
+    "        # Clip each violin to its right half, leaving room for the rain.",
+    "        vertices = body.get_paths()[0].vertices",
+    "        vertices[:, 0] = np.clip(vertices[:, 0], positions[index] + 0.08, np.inf)",
+    "        body.set_facecolor(PALETTE[index % len(PALETTE)])",
+    "        body.set_alpha(0.5)",
+    '        body.set_edgecolor("white")',
+    "    ax.boxplot(",
+    "        groups,",
+    "        positions=positions,",
+    "        widths=0.1,",
+    "        showfliers=False,",
+    "        patch_artist=True,",
+    '        boxprops={"facecolor": "white", "linewidth": 0.8},',
+    '        medianprops={"color": "#202020", "linewidth": 1.2},',
+    '        whiskerprops={"linewidth": 0.8},',
+    '        capprops={"linewidth": 0.8},',
+    "    )",
+    "    jitter = np.random.default_rng(POINT_JITTER_SEED)",
+    "    for index, values in enumerate(groups):",
+    "        spread = jitter.uniform(-0.10, -0.02, size=len(values))",
+    "        ax.scatter(",
+    "            np.full(len(values), index) + spread,",
+    "            values,",
+    "            s=6,",
+    '            color="#303030",',
+    "            alpha=0.55,",
+    "            zorder=4,",
+    "            linewidths=0,",
+    "        )",
+    "    ax.set_xticks(positions)",
+    "    ax.set_xticklabels([str(value) for value in categories])",
+    "",
+  );
+}
+
+function emitRidgeline(spec: FigureSpec & { kind: "ridgeline" }, out: string[]): void {
+  void spec;
+  // Rows of densities down the page, the measured value running across. The
+  // spec still says category on x and value on y; turning that into rows is a
+  // presentation decision and belongs here rather than in the schema.
+  out.push(
+    "",
+    "def draw_panel(ax, df):",
+    "    categories = category_order(df)",
+    "    groups = [df[df[X_FIELD] == c][Y_FIELD].dropna().to_numpy(dtype=float) for c in categories]",
+    "    grid_lo = min((g.min() for g in groups if len(g)), default=0.0)",
+    "    grid_hi = max((g.max() for g in groups if len(g)), default=1.0)",
+    "    if not np.isfinite(grid_lo) or grid_hi <= grid_lo:",
+    "        grid_lo, grid_hi = 0.0, 1.0",
+    "    pad = 0.05 * (grid_hi - grid_lo)",
+    "    grid = np.linspace(grid_lo - pad, grid_hi + pad, 256)",
+    "    # Rows overlap by a fixed fraction of the row pitch, so a taller",
+    "    # distribution cannot silently swallow the one above it.",
+    "    for index, values in enumerate(reversed(groups)):",
+    "        base = float(index)",
+    "        if len(values) < 2 or not np.isfinite(values).any():",
+    "            continue",
+    "        density = _gaussian_density(values, grid)",
+    "        peak = density.max()",
+    "        if peak <= 0:",
+    "            continue",
+    "        height = 0.92 * density / peak",
+    "        colour = PALETTE[(len(groups) - 1 - index) % len(PALETTE)]",
+    "        ax.fill_between(grid, base, base + height, color=colour, alpha=0.62, linewidth=0, zorder=index)",
+    '        ax.plot(grid, base + height, color="white", linewidth=0.7, zorder=index)',
+    "    ax.set_yticks(np.arange(len(categories)))",
+    "    ax.set_yticklabels([str(value) for value in reversed(categories)])",
+    "    ax.set_ylim(-0.15, len(categories) + 0.5)",
+    "",
+  );
+}
+
+/**
+ * A Gaussian kernel density, so a ridgeline needs no scipy.
+ *
+ * Silverman's rule picks the bandwidth, and the script prints it, because
+ * bandwidth is the one number that decides whether a distribution looks
+ * bimodal.
+ */
+function emitDensityHelper(out: string[]): void {
+  out.push(
+    "",
+    "def _gaussian_density(values, grid):",
+    "    values = values[np.isfinite(values)]",
+    "    if len(values) < 2:",
+    "        return np.zeros_like(grid)",
+    "    spread = np.std(values, ddof=1)",
+    "    if spread <= 0:",
+    "        return np.zeros_like(grid)",
+    "    # Silverman's rule of thumb.",
+    "    bandwidth = 0.9 * min(spread, (np.percentile(values, 75) - np.percentile(values, 25)) / 1.349 or spread)",
+    "    bandwidth *= len(values) ** (-0.2)",
+    "    if bandwidth <= 0:",
+    "        return np.zeros_like(grid)",
+    "    offsets = (grid[:, None] - values[None, :]) / bandwidth",
+    "    return np.exp(-0.5 * offsets**2).sum(axis=1) / (len(values) * bandwidth * np.sqrt(2 * np.pi))",
+    "",
+  );
+}
+
 function emitHeatmap(spec: FigureSpec & { kind: "heatmap" }, out: string[]): void {
   out.push(
     "",
@@ -491,9 +648,10 @@ function emitHeatmap(spec: FigureSpec & { kind: "heatmap" }, out: string[]): voi
 
 export function emitDraw(spec: PlottedSpec, out: string[]): void {
   emitSeriesHelpers(spec, out);
-  if (spec.kind === "bar" || spec.kind === "box" || spec.kind === "violin") {
+  if (hasCategoricalX(spec)) {
     emitCategories(spec, out);
   }
+  if (spec.kind === "ridgeline") emitDensityHelper(out);
 
   switch (spec.kind) {
     case "line":
@@ -508,6 +666,15 @@ export function emitDraw(spec: PlottedSpec, out: string[]): void {
     case "box":
     case "violin":
       emitDistribution(spec, out);
+      break;
+    case "ecdf":
+      emitEcdf(spec, out);
+      break;
+    case "raincloud":
+      emitRaincloud(spec, out);
+      break;
+    case "ridgeline":
+      emitRidgeline(spec, out);
       break;
     case "heatmap":
       emitHeatmap(spec, out);
