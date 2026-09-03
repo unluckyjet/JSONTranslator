@@ -286,7 +286,9 @@ floor. It compares label positions, so an annotation on the title or an inset cr
 gets caught. It measures colour distance in CIELAB under three simulated colour vision deficiencies.
 And it refuses a truncated bar axis outright, because a bar's length is its value.
 
-`docs/research.md` maps every rule to the paper or policy behind it. `examples/README.md` covers the
+`docs/research.md` maps every rule to the paper or policy behind it.
+`docs/future.md` parks what is worth building next and says why none of it is
+scheduled yet. `examples/README.md` covers the
 gallery and why its images are committed.
 
 ## The gallery, rebuilt and measured
