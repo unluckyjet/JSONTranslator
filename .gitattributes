@@ -1,0 +1,12 @@
+# The emitter writes LF, and the gallery check compares its output against the
+# committed scripts byte for byte. Without this, a Windows checkout with
+# core.autocrlf=true rewrites all fifteen to CRLF and every one of them fails a
+# check that has nothing to do with line endings. CI runs on Linux, so it never
+# sees this.
+* text=auto eol=lf
+
+# Content detection guesses these right, but a wrong guess corrupts them, and
+# the gallery is committed on purpose.
+*.png binary
+*.pdf binary
+*.gif binary
