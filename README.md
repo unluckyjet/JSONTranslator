@@ -339,3 +339,78 @@ One figure got better on its own. `06-accuracy-vs-latency` reported four finding
 one now. The two that went away are `greyscale_collision` and `series_indistinguishable`. The emitter
 had already learned to fix both by giving each series its own marker shape, and the gallery had
 simply never picked the fix up, because it was still being built from a deployment that predated it.
+
+## Sixth pass, what one stock chart broke
+
+Someone asked for a share price against its 20-day moving average. It is the most ordinary chart in
+finance and the tool had three bugs and one gap sitting in the way of it.
+
+### apply_fixes turned a year of prices into 252 bars
+
+![252 hairline bars with a solid black smear of overlapping date labels along the bottom](docs/fix-apply-fixes-bar.png)
+
+*What `apply_fixes` handed back for a daily price series*
+
+The `line_implies_continuity` suggestion hedges properly. It says a bar chart makes the same
+comparison **if** x is a set of unordered categories. Its patch did not hedge, so `apply_fixes` fired
+`{ kind: "bar", aggregation: "mean" }` at every ungrouped line chart it saw, ordered x or not.
+
+The spec carries column names and no column types, so nothing in it can tell a trading day from a
+category. There is no clever fix here, only a wrong one, so the suggestion now carries no patch and
+stays advice. A test sweeps every rule across every kind and fails if any fix payload touches `kind`,
+because rewriting the kind of chart is the most destructive edit an auto-fixer can make.
+
+### The checker measured labels that were never drawn
+
+Setting `ylim` to `(28, 57)` produced a collision against a tick reading "60". There is no 60 on the
+figure. Matplotlib lays ticks on a round grid and keeps the ones past the view limits, and those
+report themselves as visible and carry a real bounding box:
+
+```
+view limits: (28.0, 57.0)
+  tick '25'  data-y=25.0  visible=True  inside-view=False
+  tick '60'  data-y=60.0  visible=True  inside-view=False
+```
+
+Every check that measures text was counting them. This is also the `02-loss-log` finding this readme
+described two sections ago, where a minus sign supposedly collided with a log-axis tick. That figure
+is clean now, and thirteen of the fifteen pass rather than twelve of fourteen. Chasing a phantom
+label through three sets of axis limits before probing matplotlib directly is the most time any
+single bug here has cost me.
+
+### A date column had no axis to go on
+
+![The same price curve with a solid black band of 252 overlapping date labels where the axis should be](docs/fix-temporal-before.png)
+
+*A date column before `temporal` existed*
+
+Dates arrived as strings, so matplotlib treated 252 of them as 252 categories. The curve above is
+correct and the axis under it is unreadable.
+
+`"temporal": true` on the x axis of a line or scatter now parses the column, sorts by it, and hands
+the axis to `ConciseDateFormatter`. Sorting is not decoration. A date export in reverse order draws
+the line backwards, and unlike a numeric x nobody notices until they read the ticks. Four rules bound
+it, because only x can be temporal, only a line or scatter can carry it, time is not logarithmic, and
+numeric limits cannot bound a date axis.
+
+Then annotating one crashed:
+
+```
+TypeError: float() argument must be a string or a real number, not 'Timestamp'
+```
+
+`locate()` guarded with `np.isreal`, which asks whether a value is not complex. A Timestamp is not
+complex, so it passed a test meant to mean "is a plain number" and reached `float()`. Three call
+sites shared that mistake and now share one `as_coordinate` helper instead.
+
+![Simulated share price for one trading year with its 20-day rolling average, dates along the x axis](examples/baseline/15-price-and-average.png)
+
+*`examples/specs/15-price-and-average.json`, the chart that started it*
+
+The faint line is the daily close and the bold line is the 20-day average. The average turns after
+the price does at both the May peak and the August trough, which is the whole point. A moving average
+describes what already happened. The data is simulated, and the alt text says so.
+
+The typecheck passed and every test passed before I rendered that figure for the first time. The
+`Timestamp` crash was waiting on the other side of a green suite, which is the argument for the
+gallery in one sentence.
