@@ -13,7 +13,8 @@
     "example-data": "node --experimental-strip-types scripts/make-example-data.ts",
     "test:python": "node --experimental-strip-types scripts/pytest.ts",
     "recipe-check": "node --experimental-strip-types scripts/recipe-check.ts",
-    "compose-check": "node --experimental-strip-types scripts/compose-check.ts"
+    "compose-check": "node --experimental-strip-types scripts/compose-check.ts",
+    "queue": "node --experimental-strip-types scripts/queue.ts"
   },
   "type": "module",
   "dependencies": {
