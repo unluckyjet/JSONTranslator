@@ -1,6 +1,6 @@
 import { COMPARATIVE, NEEDS_TOLERANCE } from "./claims.ts";
 import { encodingSuggestions } from "./perception.ts";
-import { hasCategoricalX, type FigureSpec } from "./schema.ts";
+import { derivedAxis, hasCategoricalX, type FigureSpec } from "./schema.ts";
 
 /**
  * Checks that need only the spec, no rendering.
@@ -143,10 +143,11 @@ const fieldReferences: Rule = (spec, add) => {
   if (!columns) return;
 
   const known = new Set(columns);
-  const refs: [string, string][] = [["x.field", spec.x.field]];
-  // An ECDF's vertical axis is the cumulative proportion, which the script
-  // computes. y.field names no column and y.label is what the reader sees.
-  if (spec.kind !== "ecdf") refs.push(["y.field", spec.y.field]);
+  const refs: [string, string][] = [];
+  // Some kinds compute an axis rather than reading it. That axis still needs a
+  // label, so it still carries an AxisSpec, but its field names no column.
+  if (!derivedAxis(spec, "x")) refs.push(["x.field", spec.x.field]);
+  if (!derivedAxis(spec, "y")) refs.push(["y.field", spec.y.field]);
   if (spec.group) refs.push(["group", spec.group]);
   if (spec.facet) refs.push(["facet.by", spec.facet.by]);
   if (spec.kind === "heatmap") refs.push(["value", spec.value]);

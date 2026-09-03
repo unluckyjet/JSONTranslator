@@ -1,6 +1,6 @@
 import { hasCategoricalX, type FigureSpec, type PlottedSpec } from "../schema.ts";
 import { pyStr } from "./py.ts";
-import { BAND_ALPHA, PRESETS, RAW_ALPHA } from "./theme.ts";
+import { BAND_ALPHA, DASHED_KINDS, MARKER_KINDS, PRESETS, RAW_ALPHA } from "./theme.ts";
 import { needsMissingIntervalReport } from "./data.ts";
 
 /**
@@ -11,14 +11,23 @@ import { needsMissingIntervalReport } from "./data.ts";
  * runtime; the constants it needs were emitted into the preamble.
  */
 
+/**
+ * Kinds whose draw_panel calls series_style even for a single series.
+ *
+ * They loop over `[None]` when there is no group, which is tidier than writing
+ * every plot call twice, but it means the helper has to exist regardless.
+ */
+const ALWAYS_STYLED = new Set(["ecdf", "qq", "calibration", "kaplan_meier", "scaling_fit", "slope"]);
+
 export function emitSeriesHelpers(spec: FigureSpec, out: string[]): void {
-  if (spec.kind === "heatmap" || !spec.group) return;
+  if (spec.kind === "heatmap") return;
+  if (!spec.group && !ALWAYS_STYLED.has(spec.kind)) return;
 
   const preset = PRESETS[spec.style.preset];
-  const scatter = spec.kind === "scatter";
+  const scatter = MARKER_KINDS.has(spec.kind);
   const sizes = scatter ? preset.marker : preset.line;
   const key = scatter ? "size" : "width";
-  const dashed = spec.kind === "line" || spec.kind === "ecdf" || spec.kind === "slope";
+  const dashed = DASHED_KINDS.has(spec.kind);
   const channelConst = scatter ? "MARKERS" : dashed ? "LINE_STYLES" : "HATCHES";
   const channelKey = scatter ? "marker" : dashed ? "linestyle" : "hatch";
   const plain = scatter ? pyStr("o") : dashed ? pyStr("-") : pyStr("");
@@ -38,6 +47,8 @@ export function emitSeriesHelpers(spec: FigureSpec, out: string[]): void {
     "",
     "",
     "def series_names(frame):",
+    "    if GROUP is None:",
+    "        return [None]",
     "    if SERIES_ORDER is not None:",
     "        return [n for n in SERIES_ORDER if n in set(frame[GROUP])] or list(SERIES_ORDER)",
     "    return sorted(frame[GROUP].dropna().unique().tolist(), key=str)",
@@ -769,6 +780,247 @@ function emitDumbbell(spec: FigureSpec & { kind: "dumbbell" }, out: string[]): v
   );
 }
 
+function emitCalibration(spec: FigureSpec & { kind: "calibration" }, out: string[]): void {
+  void spec;
+  // Predicted probability against the frequency actually observed, with the
+  // diagonal a perfectly calibrated model would sit on. The bin count is
+  // printed because it decides how much miscalibration is visible.
+  out.push(
+    "",
+    "def draw_panel(ax, df):",
+    "    edges = np.linspace(0.0, 1.0, BINS + 1)",
+    "    names = series_names(df) if GROUP is not None else [None]",
+    "    for index, name in enumerate(names):",
+    "        block = df if name is None else df[df[GROUP] == name]",
+    "        block = block.dropna(subset=[X_FIELD, OUTCOME_FIELD])",
+    "        predicted = block[X_FIELD].to_numpy(dtype=float)",
+    "        observed = block[OUTCOME_FIELD].to_numpy(dtype=float)",
+    "        if not len(predicted):",
+    "            continue",
+    "        slot = np.clip(np.digitize(predicted, edges[1:-1]), 0, BINS - 1)",
+    "        centres, rates, weights = [], [], []",
+    "        for b in range(BINS):",
+    "            here = slot == b",
+    "            if not here.any():",
+    "                continue",
+    "            centres.append(predicted[here].mean())",
+    "            rates.append(observed[here].mean())",
+    "            weights.append(here.sum())",
+    "        if not centres:",
+    "            continue",
+    "        centres = np.array(centres)",
+    "        rates = np.array(rates)",
+    "        weights = np.array(weights, dtype=float)",
+    "        ece = float(np.sum(weights * np.abs(rates - centres)) / weights.sum())",
+    "        style = series_style(name, index, len(names))",
+    "        label = None if name is None else str(name)",
+    "        ax.plot(",
+    "            centres,",
+    "            rates,",
+    '            marker="o",',
+    "            markersize=4,",
+    '            label=None if label is None else f"{label} (ECE {ece:.3f})",',
+    '            color=style["colour"],',
+    '            linewidth=style["width"],',
+    '            alpha=style["alpha"],',
+    '            zorder=style["zorder"],',
+    '            linestyle=style["linestyle"],',
+    "        )",
+    "        print(",
+    '            f"calibration: {label or \'the model\'} has an expected calibration error of "',
+    '            f"{ece:.4f} over {int(weights.sum())} predictions in {len(centres)} of {BINS} bins"',
+    "        )",
+    "    # Where a perfectly calibrated model would sit.",
+    '    ax.plot([0, 1], [0, 1], color="#606060", linewidth=0.9, linestyle=(0, (4, 3)), zorder=1)',
+    "    ax.set_xlim(-0.02, 1.02)",
+    "    ax.set_ylim(-0.02, 1.02)",
+    "",
+  );
+}
+
+function emitQq(spec: FigureSpec & { kind: "qq" }, out: string[]): void {
+  const quantile =
+    spec.distribution === "normal"
+      ? "np.sqrt(2.0) * _erfinv(2.0 * probabilities - 1.0)"
+      : "probabilities";
+  out.push(
+    "",
+    "def _erfinv(values):",
+    "    # Winitzki's approximation, so a Q-Q plot needs no scipy. Good to about",
+    "    # 2e-3 across the range, which is finer than the ink.",
+    "    a = 0.147",
+    "    clipped = np.clip(values, -0.999999, 0.999999)",
+    "    ln = np.log(1.0 - clipped**2)",
+    "    first = 2.0 / (np.pi * a) + ln / 2.0",
+    "    return np.sign(clipped) * np.sqrt(np.sqrt(first**2 - ln / a) - first)",
+    "",
+    "",
+    "def draw_panel(ax, df):",
+    "    names = series_names(df) if GROUP is not None else [None]",
+    "    for index, name in enumerate(names):",
+    "        block = df if name is None else df[df[GROUP] == name]",
+    "        values = np.sort(block[Y_FIELD].dropna().to_numpy(dtype=float))",
+    "        if len(values) < 2:",
+    "            continue",
+    "        # Blom's plotting positions, which are the usual choice for a",
+    "        # normal Q-Q and behave at the tails.",
+    "        ranks = np.arange(1, len(values) + 1)",
+    "        probabilities = (ranks - 0.375) / (len(values) + 0.25)",
+    `        theoretical = ${quantile}`,
+    "        style = series_style(name, index, len(names))",
+    "        ax.scatter(",
+    "            theoretical,",
+    "            values,",
+    "            s=10,",
+    "            label=None if name is None else str(name),",
+    '            color=style["colour"],',
+    '            marker=style["marker"],',
+    "            alpha=0.7,",
+    "            linewidths=0,",
+    "            zorder=3,",
+    "        )",
+    "        # The line through the quartiles, which is where the points fall if",
+    "        # the assumed distribution holds.",
+    "        sample_q = np.percentile(values, [25, 75])",
+    "        theory_q = np.percentile(theoretical, [25, 75])",
+    "        if theory_q[1] > theory_q[0]:",
+    "            slope = (sample_q[1] - sample_q[0]) / (theory_q[1] - theory_q[0])",
+    "            intercept = sample_q[0] - slope * theory_q[0]",
+    "            span = np.array([theoretical.min(), theoretical.max()])",
+    "            ax.plot(",
+    "                span,",
+    "                intercept + slope * span,",
+    '                color=style["colour"],',
+    "                linewidth=0.9,",
+    "                linestyle=(0, (4, 3)),",
+    "                zorder=2,",
+    "            )",
+    "",
+  );
+}
+
+function emitKaplanMeier(spec: FigureSpec & { kind: "kaplan_meier" }, out: string[]): void {
+  void spec;
+  // The product-limit estimator. Censored records still contribute to the risk
+  // set up to the moment they leave, which is the whole reason not to just
+  // draw one minus the ECDF of the observed events.
+  out.push(
+    "",
+    "def draw_panel(ax, df):",
+    "    names = series_names(df) if GROUP is not None else [None]",
+    "    for index, name in enumerate(names):",
+    "        block = df if name is None else df[df[GROUP] == name]",
+    "        block = block.dropna(subset=[X_FIELD, EVENT_FIELD]).sort_values(X_FIELD)",
+    "        times = block[X_FIELD].to_numpy(dtype=float)",
+    "        events = block[EVENT_FIELD].to_numpy(dtype=float) > 0.5",
+    "        if not len(times):",
+    "            continue",
+    "        at_risk = len(times)",
+    "        survival = 1.0",
+    "        steps_t, steps_s = [float(times.min())], [1.0]",
+    "        censored_t, censored_s = [], []",
+    "        for position, moment in enumerate(times):",
+    "            if events[position]:",
+    "                survival *= 1.0 - 1.0 / at_risk",
+    "                steps_t.append(float(moment))",
+    "                steps_s.append(survival)",
+    "            else:",
+    "                censored_t.append(float(moment))",
+    "                censored_s.append(survival)",
+    "            at_risk -= 1",
+    "        style = series_style(name, index, len(names))",
+    "        ax.step(",
+    "            steps_t,",
+    "            steps_s,",
+    '            where="post",',
+    "            label=None if name is None else str(name),",
+    '            color=style["colour"],',
+    '            linewidth=style["width"],',
+    '            alpha=style["alpha"],',
+    '            zorder=style["zorder"],',
+    '            linestyle=style["linestyle"],',
+    "        )",
+    "        if censored_t:",
+    "            # Every censored record is marked. A survival curve that hides",
+    "            # them looks far more certain than the data supports.",
+    "            ax.scatter(",
+    "                censored_t,",
+    "                censored_s,",
+    '                marker="|",',
+    "                s=28,",
+    '                color=style["colour"],',
+    "                zorder=4,",
+    "                linewidths=1.0,",
+    "            )",
+    "        print(",
+    '            f"survival: {name or \'the cohort\'} had {int(events.sum())} events and "',
+    '            f"{int((~events).sum())} censored records out of {len(times)}"',
+    "        )",
+    "    ax.set_ylim(-0.02, 1.02)",
+    "",
+  );
+}
+
+function emitScalingFit(spec: FigureSpec & { kind: "scaling_fit" }, out: string[]): void {
+  // A power law fitted in log space, with the exponent and its interval
+  // printed. A scaling plot whose exponent is only eyeballed off a log-log
+  // axis is the thing this replaces.
+  out.push(
+    "",
+    "def draw_panel(ax, df):",
+    "    names = series_names(df) if GROUP is not None else [None]",
+    "    for index, name in enumerate(names):",
+    "        block = df if name is None else df[df[GROUP] == name]",
+    "        block = block.dropna(subset=[X_FIELD, Y_FIELD])",
+    "        x = block[X_FIELD].to_numpy(dtype=float)",
+    "        y = block[Y_FIELD].to_numpy(dtype=float)",
+    "        usable = (x > 0) & (y > 0)",
+    "        x, y = x[usable], y[usable]",
+    "        style = series_style(name, index, len(names))",
+    "        label = None if name is None else str(name)",
+  );
+  if (spec.show_points) {
+    out.push(
+      "        ax.scatter(",
+      "            x,",
+      "            y,",
+      "            s=14,",
+      "            label=label,",
+      '            color=style["colour"],',
+      '            marker=style["marker"],',
+      "            alpha=0.75,",
+      "            linewidths=0,",
+      "            zorder=3,",
+      "        )",
+    );
+  }
+  out.push(
+    "        if len(x) < 3:",
+    "            continue",
+    "        log_x, log_y = np.log10(x), np.log10(y)",
+    "        exponent, intercept = np.polyfit(log_x, log_y, 1)",
+    "        # The standard error of the slope, so the exponent is reported with",
+    "        # the precision the data actually supports.",
+    "        residual = log_y - (exponent * log_x + intercept)",
+    "        spread = np.sum((log_x - log_x.mean()) ** 2)",
+    "        error = float(np.sqrt(np.sum(residual**2) / max(len(x) - 2, 1) / spread)) if spread > 0 else float('nan')",
+    "        grid = np.logspace(np.log10(x.min()), np.log10(x.max()), 100)",
+    "        ax.plot(",
+    "            grid,",
+    "            10.0 ** (intercept + exponent * np.log10(grid)),",
+    '            color=style["colour"],',
+    "            linewidth=1.3,",
+    "            linestyle=(0, (5, 2)),",
+    "            zorder=2,",
+    "        )",
+    "        print(",
+    '            f"scaling: {label or \'the fit\'} follows a power law with exponent "',
+    '            f"{exponent:+.4g} plus or minus {1.96 * error:.2g} over {len(x)} points"',
+    "        )",
+    "",
+  );
+}
+
 function emitHeatmap(spec: FigureSpec & { kind: "heatmap" }, out: string[]): void {
   out.push(
     "",
@@ -875,6 +1127,18 @@ export function emitDraw(spec: PlottedSpec, out: string[]): void {
       break;
     case "dumbbell":
       emitDumbbell(spec, out);
+      break;
+    case "calibration":
+      emitCalibration(spec, out);
+      break;
+    case "qq":
+      emitQq(spec, out);
+      break;
+    case "kaplan_meier":
+      emitKaplanMeier(spec, out);
+      break;
+    case "scaling_fit":
+      emitScalingFit(spec, out);
       break;
     case "heatmap":
       emitHeatmap(spec, out);

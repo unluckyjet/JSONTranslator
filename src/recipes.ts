@@ -18,6 +18,57 @@ export type Recipe = {
 
 export const RECIPES: Recipe[] = [
   {
+    name: "reliability_diagram",
+    purpose:
+      "Predicted probability against the frequency actually observed, with the expected calibration error printed per model.",
+    spec: {
+      kind: "calibration",
+      x: { field: "confidence", label: "Predicted probability" },
+      y: { field: "observed", label: "Observed frequency" },
+      outcome: "correct",
+      group: "model",
+      bins: 12,
+      data: { path: "calibration.csv" },
+    },
+  },
+  {
+    name: "normal_qq",
+    purpose:
+      "Check the normality assumption before making a claim that depends on it. Tails that bend away from the line are the answer.",
+    spec: {
+      kind: "qq",
+      x: { field: "theoretical", label: "Theoretical quantile" },
+      y: { field: "residual", label: "Sample quantile" },
+      data: { path: "residuals.csv" },
+    },
+  },
+  {
+    name: "survival_curve",
+    purpose:
+      "Time to an event with censored records marked, so the curve does not look more certain than the data supports.",
+    spec: {
+      kind: "kaplan_meier",
+      x: { field: "hours", label: "Time", unit: "h" },
+      y: { field: "survival", label: "Surviving fraction" },
+      event: "failed",
+      group: "arm",
+      data: { path: "survival.csv" },
+    },
+  },
+  {
+    name: "power_law_fit",
+    purpose:
+      "Loss against scale on log-log axes, with the fitted exponent and its interval printed rather than eyeballed.",
+    spec: {
+      kind: "scaling_fit",
+      x: { field: "params_m", label: "Parameters", unit: "M", scale: "log" },
+      y: { field: "loss", label: "Validation loss", scale: "log" },
+      group: "family",
+      data: { path: "scaling.csv" },
+    },
+  },
+
+  {
     name: "ablation_forest",
     purpose:
       "One row per ablated component, each with its effect and interval, and a line at no effect. What an ablation table looks like when the intervals are kept.",

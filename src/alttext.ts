@@ -1,4 +1,4 @@
-import type { FigureSpec } from "./schema.ts";
+import { derivedAxis, type FigureSpec } from "./schema.ts";
 
 /**
  * Alternative text, built from the four-level semantic model in the
@@ -32,6 +32,10 @@ const KIND_PHRASING: Record<FigureSpec["kind"], string> = {
   paired_difference: "Paired-difference plot, showing the differences themselves rather than the two conditions",
   slope: "Slope chart",
   dumbbell: "Dumbbell chart, two values per row joined by a line",
+  calibration: "Reliability diagram, comparing predicted probability against observed frequency",
+  qq: "Quantile-quantile plot",
+  kaplan_meier: "Kaplan-Meier survival curve",
+  scaling_fit: "Scaling plot with a fitted power law",
   heatmap: "Heatmap",
   table: "Table",
 };
@@ -118,7 +122,13 @@ export function encodingSentence(spec: FigureSpec): string {
  * The emitted function returns a sentence, not a paragraph.
  */
 export function emitAltText(spec: FigureSpec, out: string[]): void {
-  const grouped = Boolean(spec.group) && spec.kind !== "heatmap" && spec.kind !== "ecdf";
+  // The grouped summary sorts along x and reads y, so it needs both to be
+  // real columns.
+  const grouped =
+    Boolean(spec.group) &&
+    spec.kind !== "heatmap" &&
+    !derivedAxis(spec, "y") &&
+    !derivedAxis(spec, "x");
 
   out.push(
     "",
@@ -127,7 +137,7 @@ export function emitAltText(spec: FigureSpec, out: string[]): void {
     "    parts = []",
   );
 
-  if (spec.kind === "ecdf") {
+  if (derivedAxis(spec, "y")) {
     // The vertical axis is a proportion the script computed, so there is
     // nothing to summarise there. What a reader wants is where each
     // distribution sits, which is the median and the quartile spread.

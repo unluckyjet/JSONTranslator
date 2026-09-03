@@ -146,6 +146,41 @@ for (const [name, before, after] of [
 }
 write("stages.csv", stages);
 
+const calibration = ["model,confidence,correct"];
+for (const [model, skew] of [
+  ["baseline", 0.18],
+  ["calibrated", 0.0],
+] as const) {
+  for (let index = 0; index < 900; index += 1) {
+    const truth = next();
+    const shown = Math.min(0.999, Math.max(0.001, truth + skew * (1 - truth)));
+    calibration.push(`${model},${shown.toFixed(4)},${next() < truth ? 1 : 0}`);
+  }
+}
+write("calibration.csv", calibration);
+
+// Box-Muller off the same seeded stream, so residuals are normal enough for a
+// Q-Q line to be straight.
+const residuals = ["residual"];
+for (let index = 0; index < 300; index += 1) {
+  const draw = Math.sqrt(-2 * Math.log(next() || 1e-9)) * Math.cos(2 * Math.PI * next());
+  residuals.push(draw.toFixed(5));
+}
+write("residuals.csv", residuals);
+
+const survival = ["arm,hours,failed"];
+for (const [arm, scale] of [
+  ["control", 90],
+  ["treated", 160],
+] as const) {
+  for (let index = 0; index < 70; index += 1) {
+    const time = -scale * Math.log(next() || 1e-9);
+    const cut = 40 + next() * 280;
+    survival.push(`${arm},${Math.min(time, cut).toFixed(2)},${time <= cut ? 1 : 0}`);
+  }
+}
+write("survival.csv", survival);
+
 let failures = 0;
 console.log(`python: ${python}\nworkdir: ${dir}\n`);
 

@@ -104,6 +104,8 @@ def locked_appearance(names):
 
 
 def series_names(frame):
+    if GROUP is None:
+        return [None]
     if SERIES_ORDER is not None:
         return [n for n in SERIES_ORDER if n in set(frame[GROUP])] or list(SERIES_ORDER)
     return sorted(frame[GROUP].dropna().unique().tolist(), key=str)

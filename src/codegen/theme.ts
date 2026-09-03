@@ -124,3 +124,21 @@ export const READERS = {
 } as const;
 
 export const TOOL_VERSION = "0.6.0";
+
+/**
+ * Kinds whose second channel is a dash pattern rather than a hatch or a marker.
+ *
+ * Anything that draws a line belongs here. Adding a kind to the emitter and
+ * forgetting this list produces a NameError on HATCHES at render time, which
+ * has happened twice.
+ */
+export const DASHED_KINDS = new Set([
+  "line",
+  "ecdf",
+  "slope",
+  "calibration",
+  "kaplan_meier",
+]);
+
+/** Kinds whose second channel is the marker shape, because they draw points. */
+export const MARKER_KINDS = new Set(["scatter", "qq", "scaling_fit"]);

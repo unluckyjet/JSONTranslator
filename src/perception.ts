@@ -91,6 +91,11 @@ export function primaryChannel(spec: FigureSpec): Channel {
       // The quantity a reader takes from a slope chart is the change, and a
       // change is read as an angle between two positions.
       return "slope";
+    case "calibration":
+    case "qq":
+    case "kaplan_meier":
+    case "scaling_fit":
+      return "position_common";
     case "ridgeline":
       // Rows share a baseline only with their own neighbour, so a reader
       // compares along an unaligned scale.

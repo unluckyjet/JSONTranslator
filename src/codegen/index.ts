@@ -43,6 +43,8 @@ import {
   SEQUENTIAL,
   TOOL_VERSION,
   VENUE_RULES,
+  DASHED_KINDS,
+  MARKER_KINDS,
 } from "./theme.ts";
 
 export { TOOL_VERSION } from "./theme.ts";
@@ -113,8 +115,8 @@ function emitPreamble(spec: FigureSpec, out: string[]): void {
   out.push(`ANNOTATION_PT = ${preset.annotation_pt}`);
   out.push(`PANEL_LETTER_PT = ${preset.panel_letter_pt}`);
   out.push(`SECOND_CHANNEL_THRESHOLD = ${SECOND_CHANNEL_THRESHOLD}`);
-  if (spec.kind === "scatter") out.push(`MARKERS = ${pyList(MARKERS)}`);
-  else if (spec.kind === "line" || spec.kind === "ecdf" || spec.kind === "slope") {
+  if (MARKER_KINDS.has(spec.kind)) out.push(`MARKERS = ${pyList(MARKERS)}`);
+  else if (DASHED_KINDS.has(spec.kind)) {
     out.push(`LINE_STYLES = ${pyList(LINE_STYLES)}`);
   }
   else if (spec.kind === "bar") out.push(`HATCHES = ${pyList(HATCHES)}`);
@@ -160,6 +162,10 @@ function emitPreamble(spec: FigureSpec, out: string[]): void {
   }
   if (spec.kind === "ecdf") out.push(`COMPLEMENTARY = ${spec.complementary ? "True" : "False"}`);
   if (spec.kind === "forest") out.push(`NULL_VALUE = ${spec.null_value}`);
+  if (spec.kind === "calibration") {
+    out.push(`OUTCOME_FIELD = ${JSON.stringify(spec.outcome)}`, `BINS = ${spec.bins}`);
+  }
+  if (spec.kind === "kaplan_meier") out.push(`EVENT_FIELD = ${JSON.stringify(spec.event)}`);
   if (spec.kind === "paired_difference") {
     out.push(
       `PAIR_FIELD = ${JSON.stringify(spec.pair)}`,

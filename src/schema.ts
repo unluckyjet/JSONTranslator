@@ -459,6 +459,47 @@ export const DumbbellSpec = z.object({
   sort: SortSpec.optional(),
 });
 
+export const CalibrationSpec = z.object({
+  ...xy,
+  kind: z.literal("calibration"),
+  outcome: z
+    .string()
+    .min(1)
+    .describe("Column holding the observed outcome, 0 or 1.")
+    .meta({ examples: ["correct", "label", "hit"] }),
+  bins: z
+    .int()
+    .min(3)
+    .max(50)
+    .default(10)
+    .describe("How many probability bins. Fewer bins hide miscalibration, more make each noisy."),
+});
+
+export const QqSpec = z.object({
+  ...xy,
+  kind: z.literal("qq"),
+  distribution: z
+    .enum(["normal", "uniform"])
+    .default("normal")
+    .describe("The distribution being assumed. The line is where the data would fall if it held."),
+});
+
+export const KaplanMeierSpec = z.object({
+  ...xy,
+  kind: z.literal("kaplan_meier"),
+  event: z
+    .string()
+    .min(1)
+    .describe("Column that is 1 when the event was observed and 0 when the record was censored.")
+    .meta({ examples: ["died", "failed", "converged"] }),
+});
+
+export const ScalingFitSpec = z.object({
+  ...xy,
+  kind: z.literal("scaling_fit"),
+  show_points: z.boolean().default(true),
+});
+
 export const HeatmapSpec = z.object({
   ...base,
   kind: z.literal("heatmap"),
@@ -510,6 +551,10 @@ export const FigureSpec = z.discriminatedUnion("kind", [
   PairedDifferenceSpec,
   SlopeSpec,
   DumbbellSpec,
+  CalibrationSpec,
+  QqSpec,
+  KaplanMeierSpec,
+  ScalingFitSpec,
   HeatmapSpec,
   TableSpec,
 ]);
@@ -529,9 +574,30 @@ export const FIGURE_KINDS = [
   "paired_difference",
   "slope",
   "dumbbell",
+  "calibration",
+  "qq",
+  "kaplan_meier",
+  "scaling_fit",
   "heatmap",
   "table",
 ] as const;
+
+
+/**
+ * Axes the script computes rather than reads from a column.
+ *
+ * An ECDF's proportion, a calibration plot's observed frequency, a survival
+ * curve's probability and a Q-Q plot's theoretical quantile are all worked out
+ * from the data. The axis still needs a label, so the spec still carries an
+ * AxisSpec, but its `field` names no column and nothing should check it against
+ * the file.
+ */
+export function derivedAxis(spec: FigureSpec, axis: "x" | "y"): boolean {
+  if (axis === "y") {
+    return spec.kind === "ecdf" || spec.kind === "calibration" || spec.kind === "kaplan_meier";
+  }
+  return spec.kind === "qq";
+}
 
 /** Kinds whose x is a category on an index rather than a number. */
 export function hasCategoricalX(spec: FigureSpec): boolean {
