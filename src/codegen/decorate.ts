@@ -14,6 +14,20 @@ function axisLabel(axis: AxisSpec): string {
 }
 
 /**
+ * The label for an axis that carries differences rather than values.
+ *
+ * A paired-difference plot draws subtractions, so an axis reading "Accuracy
+ * (%)" invites a reader to take 2.4 as an accuracy instead of a gain of 2.4.
+ * The unit changes too: the difference between two percentages is measured in
+ * percentage points, not in percent.
+ */
+function differenceLabel(axis: AxisSpec): string {
+  const unit = axis.unit === "%" ? "pp" : axis.unit;
+  const name = `Change in ${axis.label.charAt(0).toLowerCase()}${axis.label.slice(1)}`;
+  return unit ? `${name} (${unit})` : name;
+}
+
+/**
  * Which plot axis a spec axis lands on.
  *
  * Two kinds swap them. A horizontal bar lists categories up the vertical axis,
@@ -23,7 +37,10 @@ function axisLabel(axis: AxisSpec): string {
  */
 function plotAxis(spec: FigureSpec, specAxis: "x" | "y"): "x" | "y" {
   const swapped =
-    (spec.kind === "bar" && spec.orientation === "horizontal") || spec.kind === "ridgeline";
+    (spec.kind === "bar" && spec.orientation === "horizontal") ||
+    spec.kind === "ridgeline" ||
+    spec.kind === "forest" ||
+    spec.kind === "dumbbell";
   return swapped ? (specAxis === "x" ? "y" : "x") : specAxis;
 }
 
@@ -327,7 +344,11 @@ export function emitDecoratePanel(spec: FigureSpec, out: string[]): void {
     // A shared axis only needs its label on the outer panels.
     out.push(
       `    if show_${target}:`,
-      `        ax.set_${target}label(${pyStr(axisLabel(axis))})`,
+      `        ax.set_${target}label(${pyStr(
+        spec.kind === "paired_difference" && specAxis === "y"
+          ? differenceLabel(axis)
+          : axisLabel(axis),
+      )})`,
     );
     if (isCategorical(spec, specAxis) || spec.kind === "heatmap") continue;
     if (axis.scale !== "linear") out.push(`    ax.set_${target}scale(${pyStr(axis.scale)})`);

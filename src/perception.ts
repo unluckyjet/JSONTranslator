@@ -81,6 +81,16 @@ export function primaryChannel(spec: FigureSpec): Channel {
       // Both axes are position, and the cumulative axis needs no bin choice,
       // so nothing about the encoding is left to an author's discretion.
       return "position_common";
+    case "forest":
+    case "paired_difference":
+    case "dumbbell":
+      // Every mark sits on one shared scale, which is the best channel there
+      // is, and the interval is drawn rather than implied.
+      return "position_common";
+    case "slope":
+      // The quantity a reader takes from a slope chart is the change, and a
+      // change is read as an angle between two positions.
+      return "slope";
     case "ridgeline":
       // Rows share a baseline only with their own neighbour, so a reader
       // compares along an unaligned scale.

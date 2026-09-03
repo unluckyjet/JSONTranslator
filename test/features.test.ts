@@ -643,3 +643,80 @@ test("collapsing repeats without measuring them is a warning", () => {
   assert.ok(codes(noSpread).includes("claims_without_uncertainty"));
   assert.ok(!codes(claimSpec).includes("claims_without_uncertainty"));
 });
+
+// --- the paired and ranked kinds ----------------------------------------
+
+const twoStage = {
+  x: { field: "stage", label: "Stage" },
+  y: { field: "score", label: "Score" },
+  group: "method",
+  data: { path: "stages.csv" },
+};
+
+test("a kind that joins two marks needs two series to join", () => {
+  for (const kind of ["slope", "dumbbell"]) {
+    const { group, ...ungrouped } = twoStage;
+    assert.ok(codes({ ...ungrouped, kind }).includes("comparison_without_group"), `${kind} allowed one series`);
+    assert.ok(!codes({ ...twoStage, kind }).includes("comparison_without_group"));
+  }
+});
+
+test("the paired unit cannot be the condition it is measured under", () => {
+  const paired = {
+    kind: "paired_difference",
+    x: { field: "condition", label: "Condition" },
+    y: { field: "accuracy", label: "Accuracy", unit: "%" },
+    pair: "dataset",
+    baseline: "baseline",
+    data: { path: "paired.csv" },
+  };
+  assert.ok(!codes(paired).includes("pair_is_the_condition"));
+  assert.ok(codes({ ...paired, pair: "condition" }).includes("pair_is_the_condition"));
+});
+
+test("a difference axis says it holds differences, and percent becomes points", () => {
+  // 2.4 on this axis is a gain of 2.4, not an accuracy of 2.4, and the
+  // difference between two percentages is measured in percentage points.
+  const code = translated({
+    kind: "paired_difference",
+    x: { field: "condition", label: "Condition" },
+    y: { field: "accuracy", label: "Accuracy", unit: "%" },
+    pair: "dataset",
+    baseline: "baseline",
+    data: { path: "paired.csv" },
+  }).code;
+  assert.ok(code.includes('set_ylabel("Change in accuracy (pp)")'), "the axis still reads as a value");
+  assert.ok(!code.includes('set_ylabel("Accuracy (%)")'));
+});
+
+test("a forest cannot be drawn without the intervals that are its point", () => {
+  const forest = {
+    kind: "forest",
+    x: { field: "component", label: "Component" },
+    y: { field: "delta_pp", label: "Change in accuracy", unit: "pp" },
+    aggregation: "mean",
+    data: { path: "ablation_effects.csv" },
+  };
+  // The schema requires uncertainty outright, so this never reaches verify.
+  const result = translate(forest);
+  assert.equal(result.status, "invalid_spec");
+});
+
+test("a horizontal kind puts each label on the axis that shows it", () => {
+  for (const kind of ["forest", "dumbbell"]) {
+    const spec =
+      kind === "forest"
+        ? {
+            kind,
+            x: { field: "component", label: "Component" },
+            y: { field: "delta_pp", label: "Change in accuracy", unit: "pp" },
+            aggregation: "mean",
+            uncertainty: { kind: "ci", over: "seed" },
+            data: { path: "ablation_effects.csv" },
+          }
+        : { ...twoStage, kind };
+    const code = translated(spec).code;
+    const categoryLabel = kind === "forest" ? "Component" : "Stage";
+    assert.ok(code.includes(`set_ylabel("${categoryLabel}")`), `${kind} labelled the wrong axis`);
+  }
+});

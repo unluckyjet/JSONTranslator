@@ -423,6 +423,42 @@ export const RidgelineSpec = z.object({
   category_order: z.array(z.string().min(1)).min(1).optional(),
 });
 
+export const ForestSpec = z.object({
+  ...xy,
+  kind: z.literal("forest"),
+  null_value: z
+    .number()
+    .default(0)
+    .describe("The value that means no effect. The reference line is drawn here."),
+  category_order: z.array(z.string().min(1)).min(1).optional(),
+  aggregation: z.enum(["mean", "median"]).default("mean"),
+  uncertainty: UncertaintySpec,
+});
+
+export const PairedDifferenceSpec = z.object({
+  ...xy,
+  kind: z.literal("paired_difference"),
+  pair: z
+    .string()
+    .min(1)
+    .describe("Column identifying the unit measured under both conditions.")
+    .meta({ examples: ["subject", "seed", "dataset"] }),
+  baseline: z.string().min(1).describe("The condition subtracted from the other."),
+});
+
+export const SlopeSpec = z.object({
+  ...xy,
+  kind: z.literal("slope"),
+  category_order: z.array(z.string().min(1)).min(1).optional(),
+});
+
+export const DumbbellSpec = z.object({
+  ...xy,
+  kind: z.literal("dumbbell"),
+  category_order: z.array(z.string().min(1)).min(1).optional(),
+  sort: SortSpec.optional(),
+});
+
 export const HeatmapSpec = z.object({
   ...base,
   kind: z.literal("heatmap"),
@@ -470,6 +506,10 @@ export const FigureSpec = z.discriminatedUnion("kind", [
   EcdfSpec,
   RaincloudSpec,
   RidgelineSpec,
+  ForestSpec,
+  PairedDifferenceSpec,
+  SlopeSpec,
+  DumbbellSpec,
   HeatmapSpec,
   TableSpec,
 ]);
@@ -485,6 +525,10 @@ export const FIGURE_KINDS = [
   "ecdf",
   "raincloud",
   "ridgeline",
+  "forest",
+  "paired_difference",
+  "slope",
+  "dumbbell",
   "heatmap",
   "table",
 ] as const;
@@ -496,7 +540,11 @@ export function hasCategoricalX(spec: FigureSpec): boolean {
     spec.kind === "box" ||
     spec.kind === "violin" ||
     spec.kind === "raincloud" ||
-    spec.kind === "ridgeline"
+    spec.kind === "ridgeline" ||
+    spec.kind === "forest" ||
+    spec.kind === "paired_difference" ||
+    spec.kind === "slope" ||
+    spec.kind === "dumbbell"
   );
 }
 

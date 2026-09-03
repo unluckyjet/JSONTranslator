@@ -18,7 +18,7 @@ typecheck at every site that must handle it.
 ## Batches
 
 - [x] 1. Distribution family: `ecdf`, `raincloud`, `ridgeline`
-- [ ] 2. Paired and ranked: `forest`, `paired_difference`, `slope`, `dumbbell`
+- [x] 2. Paired and ranked: `forest`, `paired_difference`, `slope`, `dumbbell`
 - [ ] 3. Diagnostics: `calibration`, `qq`, `kaplan_meier`, `scaling_fit`
 - [ ] 4. Structure: `waterfall`, `confusion_matrix`, `sparkline_grid`
 - [ ] 5. Capabilities: effect size, bank to 45, hexbin, figure diff, units
@@ -36,4 +36,4 @@ Every batch runs the seven checks and then CI before the next starts.
 
 ## Status
 
-Batch 1 shipped. Batch 2 next.
+Batches 1 and 2 shipped. Batch 3 next.

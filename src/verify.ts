@@ -188,7 +188,12 @@ const seriesAndEmphasis: Rule = (spec, add) => {
     );
   }
 
-  if (spec.legend.show && !spec.group && spec.kind !== "heatmap") {
+  if (
+    spec.legend.show &&
+    !spec.group &&
+    spec.kind !== "heatmap" &&
+    spec.kind !== "paired_difference"
+  ) {
     add(
       "warning",
       "legend_without_group",
@@ -503,6 +508,35 @@ const composition: Rule = (spec, add) => {
   }
 };
 
+const pairedKinds: Rule = (spec, add) => {
+  if ((spec.kind === "dumbbell" || spec.kind === "slope") && !spec.group) {
+    add(
+      "error",
+      "comparison_without_group",
+      `A ${spec.kind} draws one mark per series and compares them, so it needs a group column. ` +
+        "With one series there is nothing to join.",
+    );
+  }
+
+  if (spec.kind === "paired_difference" && spec.pair === spec.x.field) {
+    add(
+      "error",
+      "pair_is_the_condition",
+      "pair names the same column as x, so every unit would be paired with itself. " +
+        "pair is the thing measured twice, x is the two conditions it was measured under.",
+    );
+  }
+
+  if (spec.kind === "paired_difference" && spec.group) {
+    add(
+      "warning",
+      "paired_difference_group_ignored",
+      "A paired-difference plot already splits by the conditions on x, so group adds nothing " +
+        "and its colours will not mean what a reader expects.",
+    );
+  }
+};
+
 const claims: Rule = (spec, add) => {
   const aggregation = "aggregation" in spec ? spec.aggregation : "none";
   const spread = "uncertainty" in spec ? spec.uncertainty : undefined;
@@ -588,6 +622,7 @@ export const RULES: Rule[] = [
   heatmapRules,
   animation,
   composition,
+  pairedKinds,
   claims,
   encodingChoice,
 ];

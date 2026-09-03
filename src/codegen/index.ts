@@ -114,7 +114,7 @@ function emitPreamble(spec: FigureSpec, out: string[]): void {
   out.push(`PANEL_LETTER_PT = ${preset.panel_letter_pt}`);
   out.push(`SECOND_CHANNEL_THRESHOLD = ${SECOND_CHANNEL_THRESHOLD}`);
   if (spec.kind === "scatter") out.push(`MARKERS = ${pyList(MARKERS)}`);
-  else if (spec.kind === "line" || spec.kind === "ecdf") {
+  else if (spec.kind === "line" || spec.kind === "ecdf" || spec.kind === "slope") {
     out.push(`LINE_STYLES = ${pyList(LINE_STYLES)}`);
   }
   else if (spec.kind === "bar") out.push(`HATCHES = ${pyList(HATCHES)}`);
@@ -159,6 +159,14 @@ function emitPreamble(spec: FigureSpec, out: string[]): void {
     out.push("POINT_JITTER_SEED = 20260902");
   }
   if (spec.kind === "ecdf") out.push(`COMPLEMENTARY = ${spec.complementary ? "True" : "False"}`);
+  if (spec.kind === "forest") out.push(`NULL_VALUE = ${spec.null_value}`);
+  if (spec.kind === "paired_difference") {
+    out.push(
+      `PAIR_FIELD = ${JSON.stringify(spec.pair)}`,
+      `BASELINE = ${JSON.stringify(spec.baseline)}`,
+      "PAIR_SEED = 20260903",
+    );
+  }
   if ("uncertainty" in spec && spec.uncertainty) {
     out.push(`CI_LEVEL = ${spec.uncertainty.level}`);
     out.push("BOOTSTRAP_SEED = 20260902");

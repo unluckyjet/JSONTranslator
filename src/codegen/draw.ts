@@ -18,7 +18,7 @@ export function emitSeriesHelpers(spec: FigureSpec, out: string[]): void {
   const scatter = spec.kind === "scatter";
   const sizes = scatter ? preset.marker : preset.line;
   const key = scatter ? "size" : "width";
-  const dashed = spec.kind === "line" || spec.kind === "ecdf";
+  const dashed = spec.kind === "line" || spec.kind === "ecdf" || spec.kind === "slope";
   const channelConst = scatter ? "MARKERS" : dashed ? "LINE_STYLES" : "HATCHES";
   const channelKey = scatter ? "marker" : dashed ? "linestyle" : "hatch";
   const plain = scatter ? pyStr("o") : dashed ? pyStr("-") : pyStr("");
@@ -581,6 +581,194 @@ function emitDensityHelper(out: string[]): void {
   );
 }
 
+function emitForest(spec: FigureSpec & { kind: "forest" }, out: string[]): void {
+  void spec;
+  // One row per entry, the effect as a dot and its interval as the bar through
+  // it, with a line at the value that means nothing happened. An ablation
+  // table is this figure with the intervals thrown away.
+  out.push(
+    "",
+    "def draw_panel(ax, df):",
+    "    frame = summarise(df)",
+    "    note_missing_interval(frame)",
+    "    categories = category_order(frame)",
+    "    for index, name in enumerate(categories):",
+    "        block = frame[frame[X_FIELD] == name]",
+    "        if not len(block):",
+    "            continue",
+    "        row = len(categories) - 1 - index",
+    "        centre = float(block[Y_FIELD].iloc[0])",
+    '        low = float(block["_low"].iloc[0]) if "_low" in block else np.nan',
+    '        high = float(block["_high"].iloc[0]) if "_high" in block else np.nan',
+    "        colour = PALETTE[index % len(PALETTE)]",
+    "        if np.isfinite(low) and np.isfinite(high):",
+    "            ax.plot(",
+    "                [low, high],",
+    "                [row, row],",
+    "                color=colour,",
+    "                linewidth=1.5,",
+    '                solid_capstyle="butt",',
+    "                zorder=2,",
+    "            )",
+    "            for edge in (low, high):",
+    "                ax.plot([edge, edge], [row - 0.14, row + 0.14], color=colour, linewidth=1.0, zorder=2)",
+    '        ax.plot([centre], [row], marker="o", markersize=5, color=colour, zorder=3, linestyle="none")',
+    "    ax.axvline(",
+    "        NULL_VALUE,",
+    '        color="#606060",',
+    "        linewidth=0.9,",
+    "        linestyle=(0, (4, 3)),",
+    "        zorder=1,",
+    "    )",
+    "    ax.set_yticks(np.arange(len(categories)))",
+    "    ax.set_yticklabels([str(value) for value in reversed(categories)])",
+    "    ax.set_ylim(-0.6, len(categories) - 0.4)",
+    "",
+  );
+}
+
+function emitPairedDifference(spec: FigureSpec & { kind: "paired_difference" }, out: string[]): void {
+  void spec;
+  // The differences themselves, not the two conditions side by side. A test on
+  // paired data operates on these numbers, so this is the distribution the
+  // p-value actually described. Two overlapping boxes are not.
+  out.push(
+    "",
+    "def _mean_interval(values):",
+    "    if len(values) < 2:",
+    "        return np.nan, np.nan",
+    "    rng = np.random.default_rng(PAIR_SEED)",
+    "    draws = rng.choice(values, size=(2000, len(values)), replace=True)",
+    "    return tuple(np.percentile(draws.mean(axis=1), [2.5, 97.5]))",
+    "",
+    "",
+    "def draw_panel(ax, df):",
+    '    wide = df.pivot_table(index=PAIR_FIELD, columns=X_FIELD, values=Y_FIELD, aggfunc="mean")',
+    "    if BASELINE not in wide.columns:",
+    '        raise SystemExit(f"baseline {BASELINE!r} is not a value of {X_FIELD}")',
+    "    others = [name for name in wide.columns if name != BASELINE]",
+    "    jitter = np.random.default_rng(PAIR_SEED)",
+    "    for index, other in enumerate(others):",
+    "        paired = wide[[BASELINE, other]].dropna()",
+    "        values = (paired[other] - paired[BASELINE]).to_numpy(dtype=float)",
+    "        if not len(values):",
+    "            continue",
+    "        colour = PALETTE[index % len(PALETTE)]",
+    "        spread = jitter.uniform(-0.07, 0.07, size=len(values))",
+    "        ax.scatter(",
+    "            np.full(len(values), index) + spread,",
+    "            values,",
+    "            s=10,",
+    "            color=colour,",
+    "            alpha=0.55,",
+    "            linewidths=0,",
+    "            zorder=2,",
+    "        )",
+    "        low, high = _mean_interval(values)",
+    "        if np.isfinite(low) and np.isfinite(high):",
+    "            ax.plot([index, index], [low, high], color=colour, linewidth=1.6, zorder=3)",
+    "        ax.plot(",
+    "            [index],",
+    "            [values.mean()],",
+    '            marker="o",',
+    "            markersize=6,",
+    "            color=colour,",
+    '            markeredgecolor="white",',
+    "            zorder=4,",
+    '            linestyle="none",',
+    "        )",
+    "    # Zero is where the two conditions agree, so it is the only reference a",
+    "    # difference plot needs.",
+    '    ax.axhline(0.0, color="#606060", linewidth=0.9, linestyle=(0, (4, 3)), zorder=1)',
+    "    ax.set_xticks(np.arange(len(others)))",
+    '    ax.set_xticklabels([f"{name} minus {BASELINE}" for name in others])',
+    "    ax.set_xlim(-0.6, len(others) - 0.4)",
+    "",
+  );
+}
+
+function emitSlope(spec: FigureSpec & { kind: "slope" }, out: string[]): void {
+  void spec;
+  // Two positions and the line between them. The reader takes the change from
+  // the angle, so every series shares one scale.
+  out.push(
+    "",
+    "def draw_panel(ax, df):",
+    "    categories = category_order(df)",
+    "    positions = np.arange(len(categories))",
+    "    names = series_names(df) if GROUP is not None else [None]",
+    "    for index, name in enumerate(names):",
+    "        block = df if name is None else df[df[GROUP] == name]",
+    "        values = np.array(",
+    "            [block[block[X_FIELD] == c][Y_FIELD].mean() for c in categories],",
+    "            dtype=float,",
+    "        )",
+    "        if not np.isfinite(values).any():",
+    "            continue",
+    "        style = series_style(name, index, len(names))",
+    "        ax.plot(",
+    "            positions,",
+    "            values,",
+    '            marker="o",',
+    "            markersize=4,",
+    "            label=None if name is None else str(name),",
+    '            color=style["colour"],',
+    '            linewidth=style["width"],',
+    '            alpha=style["alpha"],',
+    '            zorder=style["zorder"],',
+    '            linestyle=style["linestyle"],',
+    "        )",
+    "    ax.set_xticks(positions)",
+    "    ax.set_xticklabels([str(value) for value in categories])",
+    "    ax.set_xlim(-0.35, len(categories) - 0.65)",
+    "",
+  );
+}
+
+function emitDumbbell(spec: FigureSpec & { kind: "dumbbell" }, out: string[]): void {
+  void spec;
+  // Two dots per row joined by a line. The gap is the quantity, and a reader
+  // measures it along one shared scale instead of comparing two bar lengths
+  // that start in different places.
+  out.push(
+    "",
+    "def draw_panel(ax, df):",
+    "    categories = category_order(df)",
+    "    names = series_names(df) if GROUP is not None else [None]",
+    "    for index, category in enumerate(categories):",
+    "        row = len(categories) - 1 - index",
+    "        block = df[df[X_FIELD] == category]",
+    "        values = [",
+    "            float(block[Y_FIELD].mean())",
+    "            if name is None",
+    "            else float(block[block[GROUP] == name][Y_FIELD].mean())",
+    "            for name in names",
+    "        ]",
+    "        finite = [value for value in values if np.isfinite(value)]",
+    "        if len(finite) > 1:",
+    '            ax.plot([min(finite), max(finite)], [row, row], color="#9a9a9a", linewidth=1.4, zorder=1)',
+    "        for position, (name, value) in enumerate(zip(names, values)):",
+    "            if not np.isfinite(value):",
+    "                continue",
+    "            ax.plot(",
+    "                [value],",
+    "                [row],",
+    '                marker="o",',
+    "                markersize=5.5,",
+    "                color=PALETTE[position % len(PALETTE)],",
+    '                markeredgecolor="white",',
+    "                markeredgewidth=0.6,",
+    "                zorder=3,",
+    '                linestyle="none",',
+    "                label=(str(name) if index == 0 and name is not None else None),",
+    "            )",
+    "    ax.set_yticks(np.arange(len(categories)))",
+    "    ax.set_yticklabels([str(value) for value in reversed(categories)])",
+    "    ax.set_ylim(-0.6, len(categories) - 0.4)",
+    "",
+  );
+}
+
 function emitHeatmap(spec: FigureSpec & { kind: "heatmap" }, out: string[]): void {
   out.push(
     "",
@@ -675,6 +863,18 @@ export function emitDraw(spec: PlottedSpec, out: string[]): void {
       break;
     case "ridgeline":
       emitRidgeline(spec, out);
+      break;
+    case "forest":
+      emitForest(spec, out);
+      break;
+    case "paired_difference":
+      emitPairedDifference(spec, out);
+      break;
+    case "slope":
+      emitSlope(spec, out);
+      break;
+    case "dumbbell":
+      emitDumbbell(spec, out);
       break;
     case "heatmap":
       emitHeatmap(spec, out);

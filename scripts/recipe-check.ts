@@ -113,6 +113,39 @@ for (const [model, centre, spread] of [
 }
 write("latency.csv", latency);
 
+const effects = ["component,seed,delta_pp"];
+for (const [name, effect, spread] of [
+  ["+ MixUp", 1.8, 0.5],
+  ["+ Distill", 3.1, 0.4],
+  ["+ EMA", 0.3, 0.9],
+  ["+ Dropout", -0.6, 0.4],
+] as const) {
+  for (let seed = 0; seed < 6; seed += 1) {
+    effects.push(`${name},${seed},${(effect + spread * (next() * 2 - 1)).toFixed(3)}`);
+  }
+}
+write("ablation_effects.csv", effects);
+
+const paired = ["dataset,condition,accuracy"];
+for (let index = 0; index < 14; index += 1) {
+  const base = 60 + next() * 25;
+  paired.push(`d${index},baseline,${base.toFixed(3)}`);
+  paired.push(`d${index},ours,${(base + 1.4 + next() * 2).toFixed(3)}`);
+}
+write("paired.csv", paired);
+
+const stages = ["method,stage,score"];
+for (const [name, before, after] of [
+  ["alpha", 62, 71],
+  ["beta", 70, 68],
+  ["gamma", 55, 74],
+  ["delta", 66, 67],
+] as const) {
+  stages.push(`${name},before,${before}`);
+  stages.push(`${name},after,${after}`);
+}
+write("stages.csv", stages);
+
 let failures = 0;
 console.log(`python: ${python}\nworkdir: ${dir}\n`);
 

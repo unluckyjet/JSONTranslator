@@ -28,6 +28,10 @@ const KIND_PHRASING: Record<FigureSpec["kind"], string> = {
   ecdf: "Empirical cumulative distribution",
   raincloud: "Raincloud plot, showing the distribution, its quartiles and every observation",
   ridgeline: "Ridgeline plot, one distribution per row",
+  forest: "Forest plot, one effect and its interval per row",
+  paired_difference: "Paired-difference plot, showing the differences themselves rather than the two conditions",
+  slope: "Slope chart",
+  dumbbell: "Dumbbell chart, two values per row joined by a line",
   heatmap: "Heatmap",
   table: "Table",
 };

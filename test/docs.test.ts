@@ -19,12 +19,14 @@ const WORDS: Record<number, string> = {
   7: "Seven",
   10: "Ten",
   11: "eleven",
-  14: "fourteen",
+  14: "Fourteen",
+  18: "eighteen",
   15: "Fifteen",
   47: "Forty-seven",
   51: "Fifty-one",
   52: "Fifty-two",
   53: "Fifty-three",
+  56: "Fifty-six",
 };
 
 function read(path: string): string {

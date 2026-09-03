@@ -18,6 +18,57 @@ export type Recipe = {
 
 export const RECIPES: Recipe[] = [
   {
+    name: "ablation_forest",
+    purpose:
+      "One row per ablated component, each with its effect and interval, and a line at no effect. What an ablation table looks like when the intervals are kept.",
+    spec: {
+      kind: "forest",
+      x: { field: "component", label: "Component" },
+      y: { field: "delta_pp", label: "Change in accuracy", unit: "pp" },
+      aggregation: "mean",
+      uncertainty: { kind: "ci", level: 0.95, over: "seed" },
+      data: { path: "ablation_effects.csv" },
+    },
+  },
+  {
+    name: "paired_gain",
+    purpose:
+      "The per-dataset differences between two conditions, which is the quantity a paired test operates on.",
+    spec: {
+      kind: "paired_difference",
+      x: { field: "condition", label: "Condition" },
+      y: { field: "accuracy", label: "Accuracy", unit: "%" },
+      pair: "dataset",
+      baseline: "baseline",
+      data: { path: "paired.csv" },
+    },
+  },
+  {
+    name: "before_after_slope",
+    purpose: "Change between two stages, read as the angle of each line rather than two bar heights.",
+    spec: {
+      kind: "slope",
+      x: { field: "stage", label: "Stage" },
+      y: { field: "score", label: "Score" },
+      group: "method",
+      category_order: ["before", "after"],
+      data: { path: "stages.csv" },
+    },
+  },
+  {
+    name: "before_after_dumbbell",
+    purpose: "The same two stages as one row per method, where the gap itself is the quantity.",
+    spec: {
+      kind: "dumbbell",
+      x: { field: "method", label: "Method" },
+      y: { field: "score", label: "Score" },
+      group: "stage",
+      series_order: ["before", "after"],
+      data: { path: "stages.csv" },
+    },
+  },
+
+  {
     name: "latency_ecdf",
     purpose:
       "Compare whole latency distributions without choosing a bin width. Every observation is on the page and the tail is readable.",
