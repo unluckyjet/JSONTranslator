@@ -371,3 +371,53 @@ test("a scatter may be temporal too", () => {
   const found = codes({ ...dated, kind: "scatter" });
   assert.ok(!found.includes("temporal_x_on_categories"));
 });
+
+// --- a cut axis where the mark's own length is the value -----------------
+
+const BREAK = { axis: "y", from: 30, to: 60 } as const;
+
+const categorical = {
+  x: { field: "model", label: "Model" },
+  y: { field: "accuracy", label: "Final accuracy", unit: "%" },
+  data: { path: "results.csv" },
+};
+
+test("a cut axis is refused on the kinds whose mark length is the value", () => {
+  for (const kind of ["bar", "box", "violin"]) {
+    const found = verify(FigureSpec.parse({ ...categorical, kind, axis_break: BREAK }));
+    const finding = found.find((f) => f.code === "axis_break_on_length_marks");
+    assert.ok(finding, `${kind} accepted a cut axis`);
+    assert.equal(finding.severity, "error");
+    assert.match(finding.message, new RegExp(kind));
+  }
+});
+
+test("a cut axis stays legal where position carries the value", () => {
+  const positional = [
+    { ...line, kind: "line", data: { path: "results.csv" } },
+    { ...line, kind: "scatter", data: { path: "results.csv" } },
+    {
+      kind: "heatmap",
+      x: { field: "learning_rate", label: "Learning rate" },
+      y: { field: "batch_size", label: "Batch size" },
+      value: "accuracy",
+      value_label: "Accuracy",
+      data: { path: "results.csv" },
+    },
+  ];
+  for (const spec of positional) {
+    assert.ok(
+      !codes({ ...spec, axis_break: BREAK }).includes("axis_break_on_length_marks"),
+      `${spec.kind} was refused a cut axis it should keep`,
+    );
+  }
+});
+
+test("the cut-axis finding carries no patch", () => {
+  // Deleting a field through apply_fixes is untested, and an over-eager patch
+  // has shipped a bug here before.
+  const found = verify(FigureSpec.parse({ ...categorical, kind: "bar", axis_break: BREAK }));
+  const finding = found.find((f) => f.code === "axis_break_on_length_marks");
+  assert.ok(finding);
+  assert.ok(!("fix" in finding), "the finding offers a patch");
+});

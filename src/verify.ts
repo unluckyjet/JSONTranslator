@@ -480,6 +480,29 @@ const animation: Rule = (spec, add) => {
   }
 };
 
+/**
+ * Composition features on kinds that cannot carry them.
+ *
+ * A cut axis is honest on a line or a scatter, where position encodes the
+ * value and the reader reads a coordinate. It is not honest where the mark's
+ * own size is the value: cutting the axis shortens every mark by the width of
+ * the gap, so two bars that differ by five points can come out the same
+ * length. That is the failure _check_truncated_bars already treats as an
+ * error, moved from the foot of the bar to its middle.
+ */
+const composition: Rule = (spec, add) => {
+  if (spec.axis_break && hasCategoricalX(spec)) {
+    add(
+      "error",
+      "axis_break_on_length_marks",
+      `A ${spec.kind} encodes its value as the length or extent of a mark, so cutting the ` +
+        `${spec.axis_break.axis} axis leaves the drawn lengths no longer proportional to the ` +
+        `values. Put the value axis on a log scale to bring distant values together, or use ` +
+        `kind "table" when the numbers matter more than the comparison.`,
+    );
+  }
+};
+
 const claims: Rule = (spec, add) => {
   for (const claim of spec.claims ?? []) {
     if (!spec.group) {
@@ -553,6 +576,7 @@ export const RULES: Rule[] = [
   lineRules,
   heatmapRules,
   animation,
+  composition,
   claims,
   encodingChoice,
 ];

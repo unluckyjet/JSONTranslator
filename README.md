@@ -278,7 +278,7 @@ rather than a fallback to the bootstrap.
 
 ## What checks the work
 
-Fifty-one rules run on the server against the spec alone. The Python package checks the rendered
+Fifty-two rules run on the server against the spec alone. The Python package checks the rendered
 figure, which is where the rest hide.
 
 It measures every text element at the width the figure will be printed and fails below the venue's

@@ -1,7 +1,7 @@
 ---
 id: 01
 slug: reject-axis-break-on-length-marks
-status: ready
+status: done
 priority: P0
 title: Reject axis_break on bar, box and violin, where mark length carries the value
 source_idea: axis-break-on-bars.md
@@ -115,3 +115,26 @@ is a `line` spec.
 - Downgrade note: the source idea offered a `fix` of `{ axis_break: undefined }` as an
   option. I removed it. Deleting a field through the auto-repair path is untested
   behaviour and the repo has already been burned once by an over-eager patch.
+
+## Review verdict
+
+PASS. All six criteria confirmed, out-of-scope list clean, seven checks green.
+
+The auditor did not take the tests at their word. It ran an independent probe
+over all seven kinds and confirmed the rule fires on bar, box and violin and
+stays silent on line, scatter and heatmap. It checked that criterion 3 was not
+vacuous, since a negative assertion means nothing if `axis_break` were stripped
+at parse time on those kinds; it is kept, so the negative bites. It checked
+criterion 4 the same way, confirming `add` omits the `fix` key entirely rather
+than setting it undefined, so `"fix" in finding` would have caught a payload.
+It verified `grep -rn axis_break examples/` is empty rather than inferring that
+from a green `baseline --check`.
+
+It also worked out unprompted why README.md and test/docs.test.ts were in the
+diff and confirmed both are the minimum needed to keep an existing test green,
+not scope creep. 52 distinct rule codes now.
+
+Three follow-ups it raised, each written to ideas/inbox/ rather than fixed here:
+composition-rule-ignores-which-axis, axis-break-on-table, and the missing probe
+artefacts, which leave spec 07's cited evidence unverifiable from a clean
+checkout.
