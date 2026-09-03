@@ -574,3 +574,70 @@ test("repeat counts every metric panel, though they share one frame", { skip: !p
     "uncertainty: 10 of 20 points have fewer than 2 observations, so no interval is drawn for them (series: solo)",
   ]);
 });
+
+// --- a claim that the spread does not separate --------------------------
+
+const claimSpec = {
+  kind: "line",
+  x: { field: "epoch", label: "Training epoch" },
+  y: { field: "accuracy", label: "Test accuracy", unit: "%" },
+  group: "model",
+  aggregation: "mean",
+  uncertainty: { kind: "ci", over: "seed" },
+  claims: [{ kind: "beats_everywhere", subject: "ours", reference: "baseline" }],
+  data: { path: "claims.csv" },
+};
+
+function runClaim(spec: unknown, csv: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "gu-claim-"));
+  writeFileSync(join(dir, "claims.csv"), readFileSync(fixture(csv)));
+  writeFileSync(join(dir, "figure.py"), translated(spec).code);
+  return execFileSync(python!, ["figure.py"], { cwd: dir, encoding: "utf8", stdio: "pipe" });
+}
+
+test("a claim that holds on the means discloses that the intervals overlap", { skip: !python }, () => {
+  const out = runClaim(
+    { ...claimSpec, output: { stem: "overlap", formats: ["png"], dpi: 100 } },
+    "claim-overlapping.csv",
+  );
+  assert.match(out, /HOLDS/);
+  assert.match(out, /but the intervals overlap at 10 of 10 x values, so the spread does not separate them/);
+  // Never a verdict. Overlap does not disprove a difference.
+  assert.ok(!/FAILS/.test(out), "overlap was turned into a failure");
+  assert.ok(!/p\s*[=<>]/.test(out), "a p-value was invented");
+});
+
+test("the alt text carries the caveat rather than quoting the claim bare", { skip: !python }, () => {
+  const out = runClaim(
+    { ...claimSpec, output: { stem: "overlap-alt", formats: ["png"], dpi: 100 } },
+    "claim-overlapping.csv",
+  );
+  const alt = out.split(/\r?\n/).find((line) => line.startsWith("alt text:")) ?? "";
+  assert.ok(alt.includes("Ours is above baseline at every x"), "the claim vanished entirely");
+  assert.match(alt, /though the intervals overlap at 10 of 10 x values/);
+});
+
+test("a claim whose intervals stay apart is quoted without a caveat", { skip: !python }, () => {
+  const out = runClaim(
+    { ...claimSpec, output: { stem: "disjoint", formats: ["png"], dpi: 100 } },
+    "claim-disjoint.csv",
+  );
+  assert.match(out, /HOLDS/);
+  assert.ok(!/intervals overlap/.test(out), "a caveat appeared on separated intervals");
+});
+
+test("without uncertainty the overlap test is skipped, not crashed", { skip: !python }, () => {
+  const { uncertainty, ...noSpread } = claimSpec;
+  const out = runClaim(
+    { ...noSpread, output: { stem: "nospread", formats: ["png"], dpi: 100 } },
+    "claim-overlapping.csv",
+  );
+  assert.match(out, /HOLDS/);
+  assert.ok(!/intervals overlap/.test(out));
+});
+
+test("collapsing repeats without measuring them is a warning", () => {
+  const { uncertainty, ...noSpread } = claimSpec;
+  assert.ok(codes(noSpread).includes("claims_without_uncertainty"));
+  assert.ok(!codes(claimSpec).includes("claims_without_uncertainty"));
+});

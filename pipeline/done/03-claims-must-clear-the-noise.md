@@ -1,7 +1,7 @@
 ---
 id: 03
 slug: claims-must-clear-the-noise
-status: ready
+status: done
 priority: P0
 title: A claim reports HOLDS from the means alone while every interval overlaps
 source_idea: claims-must-clear-the-noise.md
@@ -140,3 +140,33 @@ This is the same concern where it has teeth. Do not remove or change the soft we
 - **[verified] `SOFT_WEIGHTS.no_uncertainty_over_repeats: 5` exists** at
   `src/perception.ts:172` and is charged at `src/perception.ts:205-210`. The source idea's
   claim about it is correct.
+
+## Verdict
+
+Shipped. Verified by me rather than by an audit agent, per the runbook's new
+rule, and by running the scripts rather than reading them.
+
+Two fixtures, same spec, opposite answers. `claim-overlapping.csv` gives `ours`
+a 0.2 lead at all ten x values while the seeds disagree by about 6, and prints:
+
+    HOLDS     ours is above baseline at every x (0 of 10 x values are not above baseline)
+              but the intervals overlap at 10 of 10 x values, so the spread does not separate them
+
+`claim-disjoint.csv` gives the same 10-of-10 lead with the seeds agreeing to
+0.3, and prints HOLDS with no caveat at all.
+
+Asserted explicitly that overlap never becomes a verdict: no FAILS appears, and
+no p-value. Cumming's Rule 7 maps overlap to a p-value only conditioned on n,
+so the line reports the count it measured and stops.
+
+The alt text keeps the claim and appends the caveat rather than dropping it, so
+a screen-reader user gets both the finding and the reason to hold it loosely.
+Dropping it would have satisfied the criterion too, but a reader who cannot see
+the bands is the one who most needs to be told they overlap.
+
+Without `uncertainty` the overlap test returns None and nothing prints, proving
+it is skipped rather than crashing on a missing `_low`.
+
+139 tests, 0 skipped. All seven checks green. All 15 generated scripts changed
+by pure addition, 705 insertions and 0 deletions, because the claims machinery
+is emitted unconditionally by design.

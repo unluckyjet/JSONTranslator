@@ -504,6 +504,17 @@ const composition: Rule = (spec, add) => {
 };
 
 const claims: Rule = (spec, add) => {
+  const aggregation = "aggregation" in spec ? spec.aggregation : "none";
+  const spread = "uncertainty" in spec ? spec.uncertainty : undefined;
+  if (spec.claims?.length && aggregation !== "none" && !spread) {
+    add(
+      "warning",
+      "claims_without_uncertainty",
+      "The claims will be tested against a summary whose spread was thrown away. " +
+        "Collapsing repeats without measuring them means a claim can hold on the means " +
+        "while the runs disagree. Set uncertainty.over to the column the repeats vary along.",
+    );
+  }
   for (const claim of spec.claims ?? []) {
     if (!spec.group) {
       add(

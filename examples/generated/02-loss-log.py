@@ -210,6 +210,43 @@ def _aligned(frame, subject, reference):
     return pair if len(pair) else None
 
 
+def _interval_overlap(frame, subject, reference):
+    """How many shared x values have overlapping intervals, or None.
+
+    None when there is nothing to measure: no reference, no grouping, or no
+    uncertainty in the spec, in which case _low was never written.
+    """
+    if reference is None or GROUP is None or "_low" not in frame:
+        return None
+    lows = frame.pivot_table(index=X_FIELD, columns=GROUP, values="_low", aggfunc="mean")
+    highs = frame.pivot_table(index=X_FIELD, columns=GROUP, values="_high", aggfunc="mean")
+    for column in (subject, reference):
+        if column not in lows.columns or column not in highs.columns:
+            return None
+    shared = lows.index.intersection(highs.index).sort_values()
+    bounds = [
+        lows.loc[shared, subject].to_numpy(dtype=float),
+        highs.loc[shared, subject].to_numpy(dtype=float),
+        lows.loc[shared, reference].to_numpy(dtype=float),
+        highs.loc[shared, reference].to_numpy(dtype=float),
+    ]
+    usable = np.all([np.isfinite(edge) for edge in bounds], axis=0)
+    if not usable.any():
+        return None
+    mine_low, mine_high, their_low, their_high = (edge[usable] for edge in bounds)
+    touching = (mine_low <= their_high) & (their_low <= mine_high)
+    return int(np.sum(touching)), int(usable.sum())
+
+
+def overlap_phrase(measured):
+    # Counts, not a p-value. Non-overlapping intervals imply a difference;
+    # overlapping ones do not imply its absence, and Cumming's mapping from
+    # overlap to significance is conditioned on n. Report what was measured.
+    if measured is None or measured[0] == 0:
+        return None
+    return f"the intervals overlap at {measured[0]} of {measured[1]} x values"
+
+
 def check_claim(frame, claim):
     """Return (holds, detail). None means the claim could not be tested."""
     subject, reference = claim["subject"], claim.get("reference")
@@ -280,6 +317,9 @@ def verify_claims(frame):
             continue
         if holds:
             print(f"  HOLDS     {sentence} ({detail})")
+            overlap = overlap_phrase(_interval_overlap(frame, claim["subject"], claim.get("reference")))
+            if overlap is not None:
+                print(f"            but {overlap}, so the spread does not separate them")
         else:
             ok = False
             print(f"  FAILS     {sentence} ({detail})")
@@ -319,6 +359,12 @@ def alt_text(frame):
             continue
         wording = claim["wording"].replace("{reference}", str(claim.get("reference")))
         sentence = f"{claim['subject']} {wording}"
+        # A claim the spread does not separate is not quoted bare. The bands
+        # are what persuade a reader to trust the verdict, so a reader who
+        # cannot see them is owed the same caveat.
+        overlap = overlap_phrase(claim.get("_overlap"))
+        if overlap is not None:
+            sentence += f", though {overlap}"
         body += " " + sentence[:1].upper() + sentence[1:] + "."
     return body
 
@@ -404,6 +450,7 @@ def main():
         for claim in CLAIMS:
             verdict, _ = check_claim(summary, claim)
             claim["_verdict"] = verdict
+            claim["_overlap"] = _interval_overlap(summary, claim["subject"], claim.get("reference"))
         description = alt_text(summary)
         if AUTHOR_CONTEXT:
             description = f"{description} {AUTHOR_CONTEXT}"

@@ -12,3 +12,4 @@ One line per state change, newest last.
 2026-09-02 22:01 cycle 9: spec 02 NEEDS_REWORK round 2, draw_with_break and add_inset double-count the accumulator; diff kept for rework
 2026-09-02 22:21 cycle 11: spec 02 NEEDS_REWORK round 3, repeat panels share one frame so id() keying undercounts by half; 2 ideas filed
 2026-09-02 22:47 cycle 13: spec 02 SHIPPED as d10506c after 4 rounds; audit loop retired as the bottleneck; runbook now fixes on verdict and caps audits at 2
+2026-09-02 22:55 spec 03 shipped: claims disclose interval overlap; alt text carries the caveat

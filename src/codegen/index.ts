@@ -426,6 +426,7 @@ function emitSaveBlock(spec: FigureSpec, out: string[]): void {
     "        for claim in CLAIMS:",
     '            verdict, _ = check_claim(summary, claim)',
     '            claim["_verdict"] = verdict',
+    '            claim["_overlap"] = _interval_overlap(summary, claim["subject"], claim.get("reference"))',
     "        description = alt_text(summary)",
     "        if AUTHOR_CONTEXT:",
     '            description = f"{description} {AUTHOR_CONTEXT}"',
