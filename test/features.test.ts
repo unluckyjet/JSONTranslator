@@ -8,9 +8,11 @@ import { RECIPES } from "../src/recipes.ts";
 import { FigureSpec } from "../src/schema.ts";
 import { translate } from "../src/translate.ts";
 import { verify } from "../src/verify.ts";
-import { resolvePython } from "../scripts/python.ts";
+import { resolvePlottingPython } from "../scripts/python.ts";
 
-const python = resolvePython();
+// Not resolvePython: a runner with system python but no matplotlib would
+// run these and fail on the import rather than skip them.
+const python = resolvePlottingPython();
 
 /** A committed CSV, resolved from this file rather than the caller's cwd. */
 function fixture(name: string): URL {

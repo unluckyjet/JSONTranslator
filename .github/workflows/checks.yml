@@ -46,6 +46,9 @@ jobs:
       - run: npm ci
       - run: pip install -r requirements.txt
       - run: pip install -e ./python
+      # The behavioural tests skip themselves without matplotlib, so the
+      # typescript job above cannot run them. This is where they actually run.
+      - run: npm test
       # The checks that need a real matplotlib, so a script that emits but does
       # not run cannot pass.
       - run: npm run render-check

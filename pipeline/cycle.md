@@ -69,6 +69,14 @@ in flight, or research has not delivered yet. Append one line to
     npm run recipe-check
     npm run compose-check
 
+**The seven are local. CI is the eighth.** Three commits shipped red because
+every local check passed and nobody looked at GitHub. After pushing:
+
+    gh run list --limit 1
+
+Wait for it, and fix a red build before taking the next spec. On this machine
+`gh` is at `/c/Program Files/GitHub CLI/gh.exe`, so quote the path.
+
 Never run bare `npm run baseline`. `scripts/baseline.ts` hardcodes `python3`,
 which on Windows is a Store stub that exits 49, and the run empties
 `examples/baseline/README.md` on its way out. Use `PYTHON=python npm run
