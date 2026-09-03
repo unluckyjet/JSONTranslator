@@ -9,7 +9,11 @@
   "y": {
     "field": "close",
     "label": "Closing price",
-    "unit": "$"
+    "unit": "$",
+    "limits": [
+      37.0,
+      61.0
+    ]
   },
   "aggregation": "mean",
   "smooth": {
@@ -18,15 +22,21 @@
     "show_raw": true
   },
   "annotate": [
-    { "at": "max", "text": "peak" },
-    { "at": "min", "text": "trough, down 38%" }
+    {
+      "at": "min",
+      "text": "the average turns after the price does"
+    }
   ],
   "legend": {
     "show": false
   },
   "data": {
     "path": "data/prices.csv",
-    "columns": ["date", "close", "volume"]
+    "columns": [
+      "date",
+      "close",
+      "volume"
+    ]
   },
   "output": {
     "stem": "15-price-and-average",
