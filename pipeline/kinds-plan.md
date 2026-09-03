@@ -36,4 +36,15 @@ Every batch runs the seven checks and then CI before the next starts.
 
 ## Status
 
-All thirteen kinds shipped. Batch 5, the capabilities, next.
+All thirteen kinds shipped, twenty-one in total. Batch 5, the five capabilities,
+is the only thing left here: effect size beside every comparison, banking to 45
+degrees, switching to hexbin above the overplotting threshold, a figure diff that
+reports which claims flipped, and unit propagation.
+
+Unit propagation landed by accident already. A paired difference of two
+percentages reports percentage points, in `differenceLabel` in
+`src/codegen/decorate.ts`. The general version has not been built.
+
+Six specs are still open in `queue.md` and five are P0, meaning a figure can
+currently mislead a reader in a way every check passes. Those outrank batch 5.
+Start with `npm run queue`, which prints the next item.
