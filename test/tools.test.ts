@@ -6,7 +6,7 @@ import { CHANNEL_RANK, designCost, encodingSuggestions, primaryChannel } from ".
 import { FigureSpec } from "../src/schema.ts";
 import { applyFix, repair, suggestFigures, type Candidate } from "../src/suggest.ts";
 import { translate } from "../src/translate.ts";
-import { verify } from "../src/verify.ts";
+import { RULES, verify } from "../src/verify.ts";
 
 const line = {
   kind: "line",
@@ -238,6 +238,48 @@ test("repair converges and reports nothing left open", () => {
 test("repair stops at its budget rather than looping", () => {
   const result = repair({ ...line, kind: "bar", aggregation: "mean", stacked: true }, 1);
   assert.equal(result.rounds, 1);
+});
+
+test("no automatic fix changes the kind of chart", () => {
+  // A patch that rewrites kind rebuilds the figure from a guess the spec cannot
+  // support. It once turned a year of daily prices into 252 bars.
+  const shapes: Record<string, unknown>[] = [
+    {},
+    { group: "model" },
+    { kind: "bar", group: "model", stacked: true },
+    { kind: "bar", group: "model", series_order: ["a", "b", "c", "d", "e"] },
+    { kind: "heatmap", value: "accuracy" },
+    { kind: "scatter" },
+    { kind: "box" },
+    { kind: "violin" },
+  ];
+
+  for (const shape of shapes) {
+    const parsed = FigureSpec.safeParse({ ...line, ...shape });
+    if (!parsed.success) continue;
+    for (const rule of RULES) {
+      rule(parsed.data, (_severity, code, _message, fix) => {
+        if (fix) assert.ok(!("kind" in fix), `fix for ${code} rewrites kind: ${JSON.stringify(fix)}`);
+      });
+    }
+  }
+});
+
+test("repair leaves a line chart a line chart", () => {
+  const result = repair({
+    ...line,
+    group: undefined,
+    aggregation: "none",
+    smooth: { kind: "rolling", window: 20 },
+  });
+  assert.equal(result.spec.kind, "line");
+});
+
+test("repair returns the spec as the schema resolves it", () => {
+  const result = repair({ ...line, kind: "bar", group: "model", stacked: true });
+  // Defaults are filled in, so the caller gets what the emitter would receive.
+  assert.ok(result.spec.output, "output defaults are missing from the repaired spec");
+  assert.ok(result.spec.style, "style defaults are missing from the repaired spec");
 });
 
 test("repair reports an unparseable spec instead of throwing", () => {

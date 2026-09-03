@@ -214,7 +214,7 @@ export function applyFix(
       typeof existing === "object" &&
       !Array.isArray(existing)
     ) {
-      merged[key] = { ...(existing as object), ...(value as object) };
+      merged[key] = { ...existing, ...value };
     } else {
       merged[key] = value;
     }
@@ -260,7 +260,7 @@ export function repair(spec: Record<string, unknown>, budget = 3): RepairResult 
     );
     if (!fixable.length) {
       return {
-        spec: current,
+        spec: { ...parsed.data },
         applied,
         remaining: findings.map((f) => ({ code: f.code, message: f.message })),
         rounds: round,
@@ -276,7 +276,7 @@ export function repair(spec: Record<string, unknown>, budget = 3): RepairResult 
   const parsed = FigureSpec.safeParse(current);
   const findings = parsed.success ? verify(parsed.data) : [];
   return {
-    spec: current,
+    spec: parsed.success ? { ...parsed.data } : current,
     applied,
     remaining: findings.map((f) => ({ code: f.code, message: f.message })),
     rounds: budget,

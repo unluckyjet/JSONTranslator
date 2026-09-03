@@ -130,8 +130,11 @@ export function encodingSuggestions(spec: FigureSpec): Suggestion[] {
       code: "line_implies_continuity",
       message:
         "A line asserts that the space between two x values means something. If x is a set of " +
-        "unordered categories, a bar chart makes the same comparison without that claim.",
-      patch: { kind: "bar", aggregation: "mean" },
+        "unordered categories, a bar chart makes the same comparison without that claim. " +
+        "Only the author can tell, so this one carries no automatic fix.",
+      // Deliberately no patch. The spec carries column names, not column types,
+      // so nothing here can tell an ordered x from an unordered one. Patching
+      // kind to "bar" on that guess turns a year of daily prices into 252 bars.
     });
   }
 
