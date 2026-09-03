@@ -158,3 +158,47 @@ proved every baseline figure was unchangeable rather than merely unchanged, by
 showing `examples/data/training.csv` has exactly 3 seeds in every (model, epoch)
 group, which makes the old `np.where` and the new bare `low` provably identical
 arrays.
+
+## Rework required, round 2
+
+The first defect is fixed and measured fixed. The auditor generated and ran
+scripts itself and counted the disclosure lines: exactly one for plain line and
+bar kinds, band and errorbar display, for ci, sem and std, and one saying
+"10 of 20" on a two-panel facet rather than "5 of 10" twice. main's own
+summarise() does not append.
+
+**The accumulator still double-counts on two composition paths.** Same defect
+class the last round named, on paths neither of us checked.
+
+1. `src/codegen/compose.ts:189-190`, `draw_with_break` runs
+   `for ax in (upper, lower): draw_panel(ax, df)`, so one dataset is noted
+   twice. Measured `uncertainty: 10 of 20 points` where the truth is 5 of 10.
+2. `src/codegen/compose.ts:142`, `add_inset` calls `draw_panel(zoom, frame)` on
+   the frame already drawn on the parent axes. Same doubling, same measurement.
+
+The numerator is the unarguable part. Five points lack an interval and the
+script says ten. Both numbers vary with how many axes the figure happens to use
+rather than with the data, which is what "the denominator must be the whole
+figure" forbids.
+
+Both ship. `verify()` returns no error for `line + aggregation + ci +
+axis_break` or `+ inset`. Nothing in the repo would have caught it, because
+`scripts/compose-check.ts`'s inset and axis_break cases carry no uncertainty.
+
+Make `note_missing_interval` idempotent per data block, or note from the panel
+loop in `emitMain` rather than from inside `draw_panel`. Then add coverage: an
+`uncertainty` case to the compose-check inset and axis_break fixtures, or an
+equivalent test.
+
+Also required, smaller:
+
+3. `test/fixtures/` is untracked. Criterion 2 says the fixture is committed. It
+   must be `git add`ed with the change or the suite breaks for everyone else.
+4. The count assertion only protects `ci`. The auditor verified sem, std and the
+   bar kind by hand and they are correct, but nothing guards them. Add cases.
+
+Not blocking, carried forward: range and iqr still draw the hairline band and
+the disclosure is silent exactly there, because min, max and both quartiles of
+one observation are finite and equal rather than NaN, so the isfinite test
+counts zero. Already filed as range-and-iqr-still-fabricate-a-band; the auditor
+reached it independently.

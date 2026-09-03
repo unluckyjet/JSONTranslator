@@ -42,6 +42,12 @@ will re-judge work it already approved unless it is told not to.
 `needs_rework` outranks `ready`, so a near miss gets finished before anything
 new starts. Set `status: in_progress` and rerun `npm run queue`.
 
+**This applies to a rework too, and forgetting it breaks step 0.** A spec left
+at `needs_rework` while its rework sits with the auditor tells the next fire to
+carry on and finish work that is already finished, on a tree it must not touch.
+The status is what separates the two, so set it before handing anything over,
+not only when starting fresh.
+
 ## 3. Build it
 
 Only what the acceptance criteria name. An idea that grew a better idea during

@@ -9,3 +9,4 @@ One line per state change, newest last.
 2026-09-02 21:13 cycle 4: spec 01 PASSED audit and shipped as af9fa5e; 3 follow-ups to inbox; next is 02
 2026-09-02 21:1x cycles 5-6: skipped, spec 02 audit in flight
 2026-09-02 21:38 cycle 7: spec 02 NEEDS_REWORK, disclosure line prints twice; code diff left in place for the rework; 2 ideas filed
+2026-09-02 22:01 cycle 9: spec 02 NEEDS_REWORK round 2, draw_with_break and add_inset double-count the accumulator; diff kept for rework
