@@ -35,6 +35,13 @@ export const AxisSpec = z.object({
     .boolean()
     .default(false)
     .describe("Format ticks as percentages. For proportions in 0-1, not values already in 0-100."),
+  temporal: z
+    .boolean()
+    .default(false)
+    .describe(
+      "Read this column as dates and lay the axis out in time. x only, and only on a line or " +
+        "scatter, because the other kinds put categories on x.",
+    ),
 });
 export type AxisSpec = z.infer<typeof AxisSpec>;
 

@@ -20,3 +20,4 @@ Regenerate with `npm run baseline`, then look at the image diff.
 | `12-sweep-heatmap` | heatmap | clean |
 | `13-direct-labels` | line | clean |
 | `14-animated-curve` | line | clean |
+| `15-price-and-average` | line | clean |

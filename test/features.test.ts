@@ -321,3 +321,53 @@ test("every recipe compiles as Python", (t) => {
     });
   }
 });
+
+// --- a temporal x axis ----------------------------------------------------
+
+const dated = {
+  kind: "line",
+  x: { field: "date", label: "Date", temporal: true },
+  y: { field: "close", label: "Closing price", unit: "$" },
+};
+
+test("a temporal axis parses the column and orders the rows by it", () => {
+  const code = translated(dated).code;
+  assert.match(code, /df\[X_FIELD\] = pd\.to_datetime\(df\[X_FIELD\]\)/);
+  assert.match(code, /df = df\.sort_values\(X_FIELD\)/);
+});
+
+test("a temporal axis brings the date locator with it", () => {
+  const code = translated(dated).code;
+  assert.match(code, /import matplotlib\.dates as mdates/);
+  assert.match(code, /ConciseDateFormatter/);
+});
+
+test("a figure with no temporal axis carries none of that", () => {
+  const code = translated({ ...line, group: undefined }).code;
+  assert.doesNotMatch(code, /mdates/);
+  assert.doesNotMatch(code, /to_datetime/);
+});
+
+test("only the x axis can be temporal", () => {
+  const found = codes({ ...dated, y: { field: "close", label: "Close", temporal: true } });
+  assert.ok(found.includes("temporal_y_axis"));
+});
+
+test("a bar puts categories on x, so it cannot also be temporal", () => {
+  assert.ok(codes({ ...dated, kind: "bar" }).includes("temporal_x_on_categories"));
+});
+
+test("time is not logarithmic", () => {
+  const found = codes({ ...dated, x: { ...dated.x, scale: "log" } });
+  assert.ok(found.includes("temporal_log_axis"));
+});
+
+test("numeric limits cannot bound a temporal axis", () => {
+  const found = codes({ ...dated, x: { ...dated.x, limits: [0, 100] } });
+  assert.ok(found.includes("temporal_axis_limits"));
+});
+
+test("a scatter may be temporal too", () => {
+  const found = codes({ ...dated, kind: "scatter" });
+  assert.ok(!found.includes("temporal_x_on_categories"));
+});

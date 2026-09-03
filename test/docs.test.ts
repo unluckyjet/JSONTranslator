@@ -15,10 +15,13 @@ const root = join(import.meta.dirname, "..");
 
 const WORDS: Record<number, string> = {
   3: "three",
+  4: "four",
   7: "Seven",
   11: "eleven",
   14: "Fourteen",
+  15: "Fifteen",
   47: "Forty-seven",
+  51: "Fifty-one",
 };
 
 function read(path: string): string {

@@ -22,7 +22,16 @@ const OPERATORS: Record<FilterOp, (field: string, value: string) => string> = {
 };
 
 export function emitLoad(spec: FigureSpec, out: string[]): void {
-  out.push("", "def load():", `    return pd.${READERS[spec.data.format]}(DATA_PATH)`, "");
+  out.push("", "def load():", `    df = pd.${READERS[spec.data.format]}(DATA_PATH)`);
+  if (spec.x.temporal) {
+    out.push(
+      "    df[X_FIELD] = pd.to_datetime(df[X_FIELD])",
+      // A date export in reverse order draws the line backwards, and unlike a
+      // numeric x nobody notices until they read the dates.
+      "    df = df.sort_values(X_FIELD)",
+    );
+  }
+  out.push("    return df", "");
 }
 
 export function emitPrepare(spec: FigureSpec, out: string[]): void {

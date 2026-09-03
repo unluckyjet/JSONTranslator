@@ -81,6 +81,7 @@ function emitPreamble(spec: FigureSpec, out: string[]): void {
     "import numpy as np",
     "import pandas as pd",
   );
+  if (spec.x.temporal) out.push("import matplotlib.dates as mdates");
   if (spec.animate) {
     out.push(
       "from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter",
@@ -111,6 +112,7 @@ function emitPreamble(spec: FigureSpec, out: string[]): void {
 
   out.push(`DATA_PATH = ${pyStr(spec.data.path)}`);
   out.push(`X_FIELD = ${pyStr(spec.x.field)}`);
+  out.push(`X_TEMPORAL = ${spec.x.temporal ? "True" : "False"}`);
   out.push(`Y_FIELD = ${pyStr(spec.kind === "heatmap" ? spec.y.field : spec.y.field)}`);
   if (spec.kind === "heatmap") {
     out.push(`VALUE_FIELD = ${pyStr(spec.value)}`);

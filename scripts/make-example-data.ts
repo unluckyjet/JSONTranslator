@@ -85,7 +85,25 @@ for (const rate of LEARNING_RATES) {
   }
 }
 
+/**
+ * A trading year, for the temporal axis. Weekdays only, so the gaps fall where
+ * a real market closes, and the drift flips twice so a moving average has
+ * something to lag behind.
+ */
+const prices = ["date,close,volume"];
+let price = 42.0;
+const day = new Date(Date.UTC(2025, 0, 2));
+for (let step = 0; step < 252; step += 1) {
+  while (day.getUTCDay() === 0 || day.getUTCDay() === 6) day.setUTCDate(day.getUTCDate() + 1);
+  const drift = step < 90 ? 0.0032 : step < 155 ? -0.0052 : 0.0042;
+  price *= Math.exp(drift + jitter(0.011));
+  const volume = Math.max(Math.round(1_800_000 + jitter(320_000)), 250_000);
+  prices.push(`${day.toISOString().slice(0, 10)},${price.toFixed(2)},${volume}`);
+  day.setUTCDate(day.getUTCDate() + 1);
+}
+
 mkdirSync(OUT, { recursive: true });
+writeFileSync(join(OUT, "prices.csv"), prices.join("\n") + "\n");
 writeFileSync(join(OUT, "sweep.csv"), sweep.join("\n") + "\n");
 writeFileSync(join(OUT, "training.csv"), training.join("\n") + "\n");
 writeFileSync(join(OUT, "benchmarks.csv"), benchmarks.join("\n") + "\n");
@@ -93,4 +111,5 @@ writeFileSync(join(OUT, "benchmarks.csv"), benchmarks.join("\n") + "\n");
 console.log(`training.csv   ${training.length - 1} rows`);
 console.log(`benchmarks.csv ${benchmarks.length - 1} rows`);
 console.log(`sweep.csv      ${sweep.length - 1} rows`);
+console.log(`prices.csv     ${prices.length - 1} rows`);
 console.log(`written to ${OUT}`);

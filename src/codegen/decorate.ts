@@ -230,6 +230,17 @@ function emitSignificance(significance: Significance, out: string[]): void {
 function emitAnnotations(spec: FigureSpec, out: string[]): void {
   out.push(
     "",
+    "def as_coordinate(value):",
+    '    """A float where matplotlib wants one, and the value itself for a date.',
+    "",
+    "    np.isreal answers a different question: a Timestamp is not complex, so it",
+    '    passed a test meant to mean "is a plain number" and then failed float().',
+    '    """',
+    "    if isinstance(value, (int, float, np.integer, np.floating)):",
+    "        return float(value)",
+    "    return value",
+    "",
+    "",
     "def locate(frame, where, series):",
     '    """Turn a semantic position into a data point."""',
     "    block = frame if series is None else frame[frame[GROUP] == series]",
@@ -247,8 +258,9 @@ function emitAnnotations(spec: FigureSpec, out: string[]): void {
     '    elif where == "crossover":',
     "        return crossover_point(frame, series)",
     "    else:",
-    "        target = where",
-    "        nearest = (block[X_FIELD] - target).abs().idxmin() if np.isreal(target) else None",
+    "        target = pd.to_datetime(where) if X_TEMPORAL else where",
+    "        by_distance = X_TEMPORAL or isinstance(target, (int, float, np.integer, np.floating))",
+    "        nearest = (block[X_FIELD] - target).abs().idxmin() if by_distance else None",
     "        if nearest is None:",
     "            match = block[block[X_FIELD] == target]",
     "            if match.empty:",
@@ -256,7 +268,7 @@ function emitAnnotations(spec: FigureSpec, out: string[]): void {
     "            row = match.iloc[0]",
     "        else:",
     "            row = block.loc[nearest]",
-    "    return float(row[X_FIELD]) if np.isreal(row[X_FIELD]) else row[X_FIELD], float(row[Y_FIELD])",
+    "    return as_coordinate(row[X_FIELD]), float(row[Y_FIELD])",
     "",
     "",
     "def crossover_point(frame, series):",
@@ -271,7 +283,7 @@ function emitAnnotations(spec: FigureSpec, out: string[]): void {
     "    if not ahead.any():",
     "        return None",
     "    at = ahead.idxmax()",
-    "    return float(at) if np.isreal(at) else at, float(pivot[series].loc[at])",
+    "    return as_coordinate(at), float(pivot[series].loc[at])",
     "",
     "",
     "def place_annotations(ax, frame):",
@@ -313,6 +325,13 @@ export function emitDecoratePanel(spec: FigureSpec, out: string[]): void {
     );
     if (isCategorical(spec, specAxis) || spec.kind === "heatmap") continue;
     if (axis.scale !== "linear") out.push(`    ax.set_${target}scale(${pyStr(axis.scale)})`);
+    if (axis.temporal) {
+      out.push(
+        `    _dates = mdates.AutoDateLocator()`,
+        `    ax.${target}axis.set_major_locator(_dates)`,
+        `    ax.${target}axis.set_major_formatter(mdates.ConciseDateFormatter(_dates))`,
+      );
+    }
     if (axis.percent) {
       out.push(
         `    ax.${target}axis.set_major_formatter(mticker.PercentFormatter(xmax=1.0))`,

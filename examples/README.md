@@ -1,6 +1,6 @@
 # Baseline gallery
 
-Fourteen figures covering every branch of the emitter. Each one is built by translating a spec with
+Fifteen figures covering every branch of the emitter. Each one is built by translating a spec with
 the emitter in this working tree, running the Python that comes out, and committing both. The code
 and the images are version controlled, so changing the emitter shows up as a reviewable diff instead
 of a surprise in someone's paper.
@@ -18,7 +18,7 @@ You need matplotlib and pandas to render. `pip install -r requirements.txt` into
 
 ## What is here
 
-`specs/` holds the fourteen inputs, one JSON file each. `data/` holds the three CSVs they read,
+`specs/` holds the fifteen inputs, one JSON file each. `data/` holds the four CSVs they read,
 written by `scripts/make-example-data.ts` from a fixed seed so the images do not move for unrelated
 reasons. `generated/` holds the emitted Python. `baseline/` holds the rendered images.
 
@@ -38,6 +38,7 @@ reasons. `generated/` holds the emitted Python. `baseline/` holds the rendered i
 | `12-sweep-heatmap` | heatmap with a labelled colourbar and annotated cells |
 | `13-direct-labels` | series named at the end of their lines instead of a legend box |
 | `14-animated-curve` | the same curve drawing itself as a gif |
+| `15-price-and-average` | a temporal x axis, with a rolling average over the raw series |
 
 ## Why the images are committed
 

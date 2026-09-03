@@ -31,6 +31,10 @@ Seven kinds: line, scatter, bar, box, violin, heatmap and table. Panels, layers,
 axes compose them. Venue presets set the column width and the font floor from the real submission
 guides, so a figure is measured against the width it will actually be printed at.
 
+Set `"temporal": true` on the x axis of a line or scatter and the column is read as dates, sorted,
+and laid out in time. The other kinds put categories on x, so the linter rejects it there rather
+than drawing something misleading.
+
 ## Third pass, the rest of the chart types
 
 | | |
@@ -274,7 +278,7 @@ rather than a fallback to the bootstrap.
 
 ## What checks the work
 
-Forty-seven rules run on the server against the spec alone. The Python package checks the rendered
+Fifty-one rules run on the server against the spec alone. The Python package checks the rendered
 figure, which is where the rest hide.
 
 It measures every text element at the width the figure will be printed and fails below the venue's
@@ -287,7 +291,7 @@ gallery and why its images are committed.
 
 ## The gallery, rebuilt and measured
 
-Fourteen figures, one per branch of the emitter. They used to be built by POSTing each spec to the
+Fifteen figures, one per branch of the emitter. They used to be built by POSTing each spec to the
 deployed API, which meant the committed images recorded whatever happened to be live rather than
 what the code in the tree does. They had fallen a version behind without anyone noticing. Every
 script in `examples/generated` claimed 0.5.0 while the emitter stamped 0.6.0. They are translated
@@ -309,13 +313,15 @@ locally now, and `npm run baseline -- --check` fails if the two ever separate ag
 | `11-seed-spread`, distribution behind the summary | `12-sweep-heatmap`, annotated cells and a labelled colourbar |
 | ![The four curves labelled at the end of each line with no legend box](examples/baseline/13-direct-labels.png) | ![The same training curves drawing themselves as an animation](examples/baseline/14-animated-curve.gif) |
 | `13-direct-labels`, names at the end of each line | `14-animated-curve`, the same figure as a gif |
+| ![Simulated share price over one trading year with its 20-day rolling average, dates along the x axis](examples/baseline/15-price-and-average.png) | |
+| `15-price-and-average`, a temporal x axis | |
 
 Each alt string above is a trimmed version of the one the script itself printed, numbers kept. The
 full sentences are longer, and the scripts write them into the exported files.
 
 ### What the checker says about its own gallery
 
-Running all fourteen through the render-time checker in `python/graphunslopify` found three problems.
+Running all fifteen through the render-time checker in `python/graphunslopify` found three problems.
 One of them was the checker's own fault.
 
 It reported `02-loss-log` drawing a minus sign on top of a log-axis tick label. That tick was never
@@ -323,7 +329,7 @@ drawn. Matplotlib lays ticks on a round grid and keeps the ones past the view li
 report themselves as visible and carry a real bounding box, so the collision checks were measuring
 labels no reader can see. The checker now skips them, and `02-loss-log` is clean.
 
-Twelve of the fourteen come back clean. The two that do not are real, and both are visible in the
+Thirteen of the fifteen come back clean. The two that do not are real, and both are visible in the
 images above. `06-accuracy-vs-latency` puts the legend over two data points at roughly 49ms and 66ms.
 `10-faceted-benchmarks` overlaps "baseline" and "+augment" on the x axis of all three panels. Neither
 is new, and rendering the scripts committed before this change reproduces both. Fixing those two

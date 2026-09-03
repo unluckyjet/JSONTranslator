@@ -101,6 +101,43 @@ const axisLimits: Rule = (spec, add) => {
   }
 };
 
+const temporalAxis: Rule = (spec, add) => {
+  if (spec.y.temporal) {
+    add(
+      "error",
+      "temporal_y_axis",
+      "Only the x axis reads as time. A date on y would need a horizontal timeline, which this " +
+        "does not draw.",
+      { y: { temporal: false } },
+    );
+  }
+
+  if (!spec.x.temporal) return;
+
+  if (spec.kind !== "line" && spec.kind !== "scatter") {
+    add(
+      "error",
+      "temporal_x_on_categories",
+      `A ${spec.kind} puts categories on x, so it cannot also lay that axis out in time.`,
+    );
+  }
+  if (spec.x.scale !== "linear") {
+    add(
+      "error",
+      "temporal_log_axis",
+      `x is temporal but its scale is ${spec.x.scale}. Time is not logarithmic.`,
+      { x: { scale: "linear" } },
+    );
+  }
+  if (spec.x.limits) {
+    add(
+      "error",
+      "temporal_axis_limits",
+      "x.limits are numbers, so they cannot bound a temporal axis. Filter the rows instead.",
+    );
+  }
+};
+
 const fieldReferences: Rule = (spec, add) => {
   const columns = spec.data.columns;
   if (!columns) return;
@@ -502,6 +539,7 @@ const encodingChoice: Rule = (spec, add) => {
 
 export const RULES: Rule[] = [
   axisLimits,
+  temporalAxis,
   fieldReferences,
   seriesAndEmphasis,
   rasterResolution,
