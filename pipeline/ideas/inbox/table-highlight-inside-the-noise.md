@@ -84,12 +84,15 @@ happens in the emitted script, on the author's rows.
 - `src/schema.ts`: no new field. Possibly a `tie` policy field if the auditor wants the tie
   behaviour configurable, but I would hard-code "bold the tied set" first.
 - `src/verify.ts`: either nothing, or the fallback error if the feature is deferred.
-- `src/recipes.ts`: the table recipe gains an `uncertainty` block so the path is exercised.
+- `scripts/compose-check.ts`: the `table` fixture gains an `uncertainty` block so the path is
+  exercised. There is no table entry in `src/recipes.ts` today; adding one would be a reasonable
+  companion change but is not required by this idea.
 
 ## How you would know it worked
 
 1. `npm run compose-check` -- the table fixtures still emit and run.
-2. Render the table recipe against a CSV with several seeds per cell. The written `.md` must contain
+2. Render the `table` fixture from `scripts/compose-check.ts` against a CSV with several seeds
+   per cell. The written `.md` must contain
    a `±` (or an interval) in every cell, and the `.tex` the LaTeX equivalent.
 3. Two fixtures, same spec: one where the leader's interval clears the runner-up's, one where they
    overlap. In the first, exactly one cell per row is bold. In the second, both are bold and the

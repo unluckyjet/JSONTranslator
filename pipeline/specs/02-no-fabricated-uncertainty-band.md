@@ -1,0 +1,127 @@
+---
+id: 02
+slug: no-fabricated-uncertainty-band
+status: ready
+priority: P0
+title: A group with fewer than two observations draws a zero-width band that reads as perfect agreement
+source_idea: report-sample-size.md
+---
+
+# A group with fewer than two observations draws a zero-width band that reads as perfect agreement
+
+## Problem
+
+`bootstrap_interval` in `src/codegen/data.ts:207-211` refuses to resample a group with fewer
+than two finite values, and correctly appends `np.nan` for its low and high:
+
+```python
+values = block[Y_FIELD].dropna().to_numpy(dtype=float)
+if len(values) < 2:
+    lows.append(np.nan)
+    highs.append(np.nan)
+    continue
+```
+
+`emitSummarise` then throws that refusal away, at `src/codegen/data.ts:190-191`:
+
+```python
+summary["_low"] = np.where(np.isfinite(low), low, centre)
+summary["_high"] = np.where(np.isfinite(high), high, centre)
+```
+
+Substituting the centre turns "no interval could be measured" into "the interval is exactly
+zero". `emitDraw` in `src/codegen/draw.ts:133-146` then calls `fill_between(x, _low, _high)`
+and draws a band of zero height, and `src/codegen/draw.ts:147-160` draws an errorbar with
+zero-length whiskers for `display: "bar"`. `error_pair` in `src/codegen/decorate.ts:82-92`
+does the same for bar charts.
+
+A reader sees a curve with a band that pinches to a hairline at those points and reads
+perfect agreement across seeds. The truth is that there was one seed. This is the tool
+fabricating precision, in the one feature `docs/research.md:74-86` calls "the biggest gap"
+it closed.
+
+The substitution is not limited to `ci`. Every `uncertainty.kind` routes through the same
+two lines, so `sem` with one observation (`spread.sem(ddof=1)` is NaN) reaches it too.
+
+## Change
+
+In `src/codegen/data.ts`, stop substituting the centre. Assign `_low` and `_high` from
+`low` and `high` directly, so a group with no measurable interval keeps `NaN`.
+
+Then make the three drawing paths tolerate `NaN` rather than drawing a degenerate mark:
+
+- `src/codegen/draw.ts:133-146`, the `fill_between` band. `fill_between` already leaves a
+  gap where either bound is `NaN`; confirm by rendering rather than by reading.
+- `src/codegen/draw.ts:147-160`, the `errorbar` path. `yerr` containing `NaN` must not
+  raise and must not draw a cap. Mask the non-finite rows out of the `x`, `y` and `yerr`
+  arrays if matplotlib does not handle it cleanly.
+- `src/codegen/decorate.ts:82-92`, `error_pair` for bar charts. Same treatment.
+
+And disclose it. `summarise()` counts the rows it collapsed per group anyway; emit one
+printed line when any summarised point has no interval, naming how many points and which
+series, for example:
+
+```
+uncertainty: 3 of 20 points have fewer than 2 observations, so no interval is drawn for them (series: solo)
+```
+
+The script must still exit 0. Once the band is gone there is nothing misleading left — a
+missing band correctly says no spread was measured — and a hard exit would block an author
+whose single-seed point is legitimate. This is a deliberate choice against the source
+idea, which asked for a non-zero exit; see Evidence.
+
+## Acceptance criteria
+
+1. `npm test` passes, and a new test in `test/features.test.ts` asserts that the Python
+   emitted for a `line` spec with `aggregation: "mean"` and
+   `uncertainty: { kind: "ci", over: "seed" }` does **not** contain the string
+   `np.where(np.isfinite(low), low, centre)`.
+2. A fixture CSV is committed under `test/` or `examples/data/` in which one series has
+   exactly one row per x value and at least one other series has three or more. Running the
+   script generated for it prints a line naming the number of points with no interval and
+   the affected series name, and exits 0.
+3. On that same fixture, a check asserts the emitted script's `summarise()` output has
+   non-finite `_low` for the single-observation series' rows and finite `_low` for the
+   multi-observation series' rows. A short Python test under `npm run test:python` is the
+   natural home.
+4. On that same fixture, rendering with `uncertainty.display: "bar"` completes without
+   raising, proving the `errorbar` path tolerates `NaN` in `yerr`.
+5. `npm run render-check` passes: all fifteen baseline scripts still run to completion.
+6. `npm run baseline -- --check` passes after regenerating. The diff to the committed
+   scripts must be confined to the `_low`/`_high` assignment, the drawing paths named above,
+   and the new printed line. If any baseline script's *figure* changes, that baseline
+   contained a fabricated band and the change is correct — say so in the review.
+7. `npm run typecheck`, `npm test`, `npm run test:python`, `npm run recipe-check` and
+   `npm run compose-check` all pass.
+
+## Out of scope
+
+- Do **not** add the per-group *n* report, the alt-text *n*, or any row-loss accounting.
+  That is spec 08, which introduces `report_counts()` and owns the printed accounting
+  block. This spec prints one line about missing intervals and nothing else.
+- Do **not** add a spec field. `aggregation` and `uncertainty` already declare everything
+  this needs.
+- Do **not** change `mark_significance`'s silent `continue` when `compare()` returns `None`
+  (`src/codegen/decorate.ts:206-207`). That is spec 08.
+- Do **not** change `bootstrap_interval`'s `len(values) < 2` threshold or the bootstrap
+  itself.
+- Do **not** draw an "n = 1" annotation on the figure.
+
+## Evidence
+
+- **[verified] by me, in this repo.** `src/codegen/data.ts:207-211` shows the `NaN` being
+  produced; `src/codegen/data.ts:190-191` shows it being overwritten with the centre;
+  `src/codegen/draw.ts:133-160` and `src/codegen/decorate.ts:82-92` are the three consumers.
+- **[verified] Cumming, Fidler and Vaux, "Error bars in experimental biology", *Journal of
+  Cell Biology* 177(1):7-11, 2007.** I fetched https://pmc.ncbi.nlm.nih.gov/articles/PMC2064100/
+  and confirmed the authors, journal, volume, issue, pages and year, and confirmed Rule 3
+  verbatim: "error bars and statistics should only be shown for independently repeated
+  experiments, and never for replicates." A band drawn where there was no repeat is the
+  clearest possible violation of that rule — the tool is showing an error bar for something
+  that was not repeated at all.
+- Downgrade note: the source idea argued `n = 1` "should be an error, not a warning -- the
+  script should refuse rather than draw a zero-width band." I kept the diagnosis and
+  changed the remedy. The misleading artefact is the zero-width band, not the single
+  observation; removing the band removes the misreading, and Cumming's Rule 3 asks that no
+  bar be shown, not that the figure be refused. A non-zero exit on the author's own machine
+  for data they may legitimately have is a cost with no remaining honesty benefit.

@@ -112,3 +112,53 @@ CSV.
    round-trips through `validate_spec` with no findings.
 5. `npm run baseline -- --check` after regenerating, to confirm no emitted script changed except
    where a level genuinely alters the axis handling.
+
+---
+
+## Rejected because
+
+**Rule 5: it cannot be checked by running something — once the one dangerous part is
+removed, no acceptance criterion demonstrates a real figure or a committed spec
+improving.**
+
+The evidence is fine and the design is not wrong. Spot-checking the one `[verified]`
+claim: the Vega-Lite paper is real, is already cited in `docs/research.md:169`, and does
+carry the nominal/ordinal/quantitative/temporal type system the idea quotes. Nothing here
+is fabricated. The rejection is about readiness, not honesty.
+
+**1. The load-bearing payoff requires re-opening a guard on a shipped bug.**
+Benefit 1 of the six offered is restoring the `kind: "bar"` patch to
+`line_implies_continuity` in `src/perception.ts:130`, gated on `x.level === "nominal"`.
+The idea concedes what that costs, in its own Rough shape section:
+
+> The existing test that forbids a fix payload touching `kind` must be amended
+> deliberately, with a comment explaining why the gate is now safe, since that test exists
+> to prevent a specific past bug.
+
+That test guards the failure `README.md:348-361` documents — `apply_fixes` turning a year
+of daily prices into 252 bars. The repo's own conclusion was "There is no clever fix here,
+only a wrong one." Trading a regression test on a shipped bug for a heuristic gate on a
+field the agent supplies is not a trade this queue will make.
+
+**2. With that removed, the remaining criteria do not demonstrate an improvement.**
+`level` would be a new field that nothing in the repo populates, so criteria 1 and 2
+exercise synthetic specs in `test/` only. Criterion 3 asserts recipes still validate,
+which is a no-regression check, not a benefit. Criterion 5 — "no emitted script changed
+except where a level genuinely alters the axis handling" — is a human judgement, not a
+runnable check, and is exactly what `pipeline/README.md:47` says disqualifies a spec.
+
+**3. It is a migration, not a change.** By its own Rough shape it touches `src/schema.ts`,
+`src/verify.ts`, `src/perception.ts`, `src/suggest.ts`,
+`python/graphunslopify/describe.py`, `src/recipes.ts` and every file in
+`examples/specs/`. Implementation takes the top ready spec, writes the code, and stops;
+this is at least three specs wearing one hat.
+
+### What would make it approvable
+
+Come back with the smallest slice that changes a real artefact and leaves the `kind`-patch
+regression test untouched. The most likely candidate: `level` as an optional field on
+`AxisSpec`, `describe.py` proposing it from the local CSV, and exactly one new error —
+`bar`/`box`/`violin` over `x.level: "quantitative"`, which is a genuine misrepresentation
+nothing catches today. Acceptance criteria must name a committed spec or example CSV whose
+output changes, not only a synthetic spec in `test/`. `temporal`, `hasCategoricalX`,
+`designCost` and `line_implies_continuity` all stay out of that slice.
