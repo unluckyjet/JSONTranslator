@@ -71,13 +71,51 @@ def _overlaps(a: Any, b: Any, pad: float = 0.0) -> bool:
     )
 
 
+def _drawn_tick_labels(axes: Any, which: str) -> list[Any]:
+    """Tick labels that actually appear on this axes, in axis order.
+
+    The locator lays ticks on a round grid and keeps the ones past the view
+    limits. Those report get_visible() as True and carry a real bounding box,
+    but nothing draws them, so anything that measures text has to drop them.
+    Limits are sorted because an inverted axis reports them high to low.
+    """
+    labels, limits, index = (
+        (axes.get_xticklabels(), axes.get_xlim(), 0)
+        if which == "x"
+        else (axes.get_yticklabels(), axes.get_ylim(), 1)
+    )
+    low, high = sorted(limits)
+    return [
+        label
+        for label in labels
+        if label.get_visible()
+        and (label.get_text() or "").strip()
+        and low <= label.get_position()[index] <= high
+    ]
+
+
+def _undrawn_tick_ids(figure: Any) -> set[int]:
+    """Tick labels that exist as artists but never reach the page."""
+    drawn: set[int] = set()
+    every: set[int] = set()
+    for axes in figure.get_axes():
+        for which in ("x", "y"):
+            drawn.update(id(label) for label in _drawn_tick_labels(axes, which))
+        every.update(id(label) for label in axes.get_xticklabels())
+        every.update(id(label) for label in axes.get_yticklabels())
+    return every - drawn
+
+
 def _visible_texts(figure: Any) -> Iterable[Any]:
     from matplotlib.text import Text
 
+    undrawn = _undrawn_tick_ids(figure)
     for artist in figure.findobj(Text):
         if not artist.get_visible():
             continue
         if not (artist.get_text() or "").strip():
+            continue
+        if id(artist) in undrawn:
             continue
         yield artist
 
@@ -109,11 +147,10 @@ def _check_text_size(figure: Any, report: Report, scale: float, floor: float) ->
 
 
 def _check_tick_collisions(axes: Any, renderer: Any, report: Report) -> None:
-    for name, ticks in (("x", axes.get_xticklabels()), ("y", axes.get_yticklabels())):
+    for name in ("x", "y"):
         boxes = [
             (label.get_text(), label.get_window_extent(renderer))
-            for label in ticks
-            if label.get_visible() and (label.get_text() or "").strip()
+            for label in _drawn_tick_labels(axes, name)
         ]
         for i in range(len(boxes) - 1):
             left, right = boxes[i], boxes[i + 1]
@@ -138,6 +175,7 @@ def _check_text_collisions(figure: Any, renderer: Any, report: Report) -> None:
     from matplotlib.text import Text
 
     entries: list[tuple[str, Any, int, bool]] = []
+    undrawn = _undrawn_tick_ids(figure)
     for axes in figure.get_axes():
         if not axes.get_visible():
             continue
@@ -145,6 +183,8 @@ def _check_text_collisions(figure: Any, renderer: Any, report: Report) -> None:
         ticks = {id(t) for t in list(axes.get_xticklabels()) + list(axes.get_yticklabels())}
         for artist in axes.findobj(Text):
             if not artist.get_visible() or not (artist.get_text() or "").strip():
+                continue
+            if id(artist) in undrawn:
                 continue
             try:
                 box = artist.get_window_extent(renderer)

@@ -328,3 +328,33 @@ def test_warnings_alone_leave_the_report_ok():
     report = inspect_figure(fig)
     assert report.findings
     assert report.ok
+
+
+def test_a_tick_the_locator_kept_offscreen_is_not_a_collision():
+    """The locator lays ticks on a round grid and keeps the ones past the limits.
+
+    They report get_visible() as True and carry a real bounding box, so the
+    collision checks used to measure a "60" that no reader can see and report it
+    landing on the title.
+    """
+    fig, ax = plt.subplots(figsize=(3.4, 2.6))
+    ax.plot(range(1, 253), [42 + (i % 20) for i in range(252)])
+    ax.set_ylim(28, 57)
+    ax.set_title("The average follows the price, it does not predict it")
+
+    offscreen = [t.get_text() for t in ax.get_yticklabels() if t.get_position()[1] > 57]
+    assert offscreen, "this figure no longer reproduces the offscreen tick"
+    assert "labels_collide" not in codes(fig)
+
+
+def test_an_inverted_axis_still_reports_its_drawn_ticks():
+    """Limits come back high to low when the axis is inverted, so they get sorted."""
+    from graphunslopify.inspect import _drawn_tick_labels
+
+    fig, ax = plt.subplots(figsize=(3.4, 2.6))
+    ax.plot([1, 2, 3], [10, 20, 30])
+    ax.set_ylim(35, 5)
+    fig.canvas.draw()
+
+    drawn = [t.get_text() for t in _drawn_tick_labels(ax, "y")]
+    assert drawn, "an inverted axis reported no drawn ticks at all"

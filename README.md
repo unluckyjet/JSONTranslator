@@ -315,17 +315,19 @@ full sentences are longer, and the scripts write them into the exported files.
 
 ### What the checker says about its own gallery
 
-Running all fourteen through the render-time checker in `python/graphunslopify` is the part I did not
-expect to enjoy. Eleven come back clean. Three do not, and all three are right.
+Running all fourteen through the render-time checker in `python/graphunslopify` found three problems.
+One of them was the checker's own fault.
 
-`02-loss-log` draws a minus sign on top of a log-axis tick label. `06-accuracy-vs-latency` puts the
-legend over two data points, which you can see above at roughly 49ms and 66ms. `10-faceted-benchmarks`
-overlaps "baseline" and "+augment" on the x axis of all three panels.
+It reported `02-loss-log` drawing a minus sign on top of a log-axis tick label. That tick was never
+drawn. Matplotlib lays ticks on a round grid and keeps the ones past the view limits, and those
+report themselves as visible and carry a real bounding box, so the collision checks were measuring
+labels no reader can see. The checker now skips them, and `02-loss-log` is clean.
 
-None of them are new. Rendering the scripts committed before this change reproduces all three, so the
-gallery has been shipping figures its own tool would reject. That is a decent argument for the tool
-and a poor look for the gallery. Fixing the three specs belongs in its own change rather than a quiet
-edit here.
+Twelve of the fourteen come back clean. The two that do not are real, and both are visible in the
+images above. `06-accuracy-vs-latency` puts the legend over two data points at roughly 49ms and 66ms.
+`10-faceted-benchmarks` overlaps "baseline" and "+augment" on the x axis of all three panels. Neither
+is new, and rendering the scripts committed before this change reproduces both. Fixing those two
+specs belongs in its own change rather than a quiet edit here.
 
 One figure got better on its own. `06-accuracy-vs-latency` reported four findings before and reports
 one now. The two that went away are `greyscale_collision` and `series_indistinguishable`. The emitter
