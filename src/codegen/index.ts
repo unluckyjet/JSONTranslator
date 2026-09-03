@@ -166,6 +166,10 @@ function emitPreamble(spec: FigureSpec, out: string[]): void {
     out.push(`OUTCOME_FIELD = ${JSON.stringify(spec.outcome)}`, `BINS = ${spec.bins}`);
   }
   if (spec.kind === "kaplan_meier") out.push(`EVENT_FIELD = ${JSON.stringify(spec.event)}`);
+  if (spec.kind === "waterfall") out.push(`START = ${spec.start}`);
+  if (spec.kind === "confusion_matrix" && spec.value) {
+    out.push(`VALUE_FIELD = ${JSON.stringify(spec.value)}`);
+  }
   if (spec.kind === "paired_difference") {
     out.push(
       `PAIR_FIELD = ${JSON.stringify(spec.pair)}`,

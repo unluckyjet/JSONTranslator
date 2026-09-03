@@ -407,6 +407,21 @@ def _bar_value_axis(axes: Any) -> str | None:
     return "y" if verticals >= len(bars) / 2 else "x"
 
 
+def _bars_float(axes: Any, which: str) -> bool:
+    """Whether the bars start at different places rather than a shared baseline.
+
+    A waterfall stacks each contribution on the running total, so only the first
+    and the last touch the baseline. Its bars are meant to float, and the
+    truncation rule below assumes they do not: it would fire on every waterfall
+    ever drawn and tell the author to do something that would destroy the chart.
+    """
+    from matplotlib.patches import Rectangle
+
+    bars = [p for p in axes.patches if isinstance(p, Rectangle) and p.get_visible()]
+    starts = {round(bar.get_y() if which == "y" else bar.get_x(), 6) for bar in bars}
+    return len(starts) > 1
+
+
 def _check_truncated_bars(axes: Any, report: Report) -> None:
     """A bar's length encodes its value, so a cut baseline overstates differences.
 
@@ -416,6 +431,8 @@ def _check_truncated_bars(axes: Any, report: Report) -> None:
     """
     which = _bar_value_axis(axes)
     if which is None:
+        return
+    if _bars_float(axes, which):
         return
 
     low, high = axes.get_ylim() if which == "y" else axes.get_xlim()

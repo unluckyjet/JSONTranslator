@@ -720,3 +720,52 @@ test("a horizontal kind puts each label on the axis that shows it", () => {
     assert.ok(code.includes(`set_ylabel("${categoryLabel}")`), `${kind} labelled the wrong axis`);
   }
 });
+
+// --- the structural kinds -----------------------------------------------
+
+test("a confusion matrix must say how it is normalised", () => {
+  // Row, column and none make different claims: recall, precision and support.
+  const base = {
+    kind: "confusion_matrix",
+    x: { field: "predicted", label: "Predicted" },
+    y: { field: "actual", label: "True label" },
+    data: { path: "confusion.csv" },
+  };
+  assert.equal(translate(base).status, "invalid_spec");
+  assert.equal(translate({ ...base, normalize: "row" }).status, "translated");
+});
+
+test("each normalisation divides along its own axis", () => {
+  const base = {
+    kind: "confusion_matrix",
+    x: { field: "predicted", label: "Predicted" },
+    y: { field: "actual", label: "True label" },
+    data: { path: "confusion.csv" },
+  };
+  assert.ok(translated({ ...base, normalize: "row" }).code.includes("raw.sum(axis=1, keepdims=True)"));
+  assert.ok(translated({ ...base, normalize: "column" }).code.includes("raw.sum(axis=0, keepdims=True)"));
+  assert.ok(!translated({ ...base, normalize: "none" }).code.includes("keepdims=True"));
+});
+
+test("a waterfall states its order, because the order is the claim", () => {
+  const base = {
+    kind: "waterfall",
+    x: { field: "component", label: "Component" },
+    y: { field: "delta", label: "Change", unit: "pp" },
+    start: 74.2,
+    data: { path: "waterfall.csv" },
+  };
+  assert.equal(translate(base).status, "invalid_spec");
+  const code = translated({ ...base, category_order: ["a", "b"] }).code;
+  assert.ok(code.includes("START = 74.2"));
+  // Autoscale measures the bars and not the baseline they rise from.
+  assert.ok(code.includes("ax.set_ylim(floor - pad, ceiling + pad)"));
+});
+
+test("floating bars are exempt from the truncation rule", () => {
+  // A waterfall's bars are meant not to share a baseline. The rule that fires
+  // on a cut bar axis would fire on every waterfall ever drawn.
+  const source = readFileSync(new URL("../python/graphunslopify/inspect.py", import.meta.url), "utf8");
+  assert.ok(source.includes("def _bars_float("));
+  assert.ok(source.includes("if _bars_float(axes, which):"));
+});

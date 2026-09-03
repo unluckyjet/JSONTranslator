@@ -18,6 +18,45 @@ export type Recipe = {
 
 export const RECIPES: Recipe[] = [
   {
+    name: "confusion_row_normalised",
+    purpose:
+      "Row-normalised, so each cell reads as recall for that true class. The normalisation is required because raw counts and column-normalised make different claims.",
+    spec: {
+      kind: "confusion_matrix",
+      x: { field: "predicted", label: "Predicted" },
+      y: { field: "actual", label: "True label" },
+      normalize: "row",
+      data: { path: "confusion.csv" },
+    },
+  },
+  {
+    name: "ablation_waterfall",
+    purpose:
+      "Contributions stacked from a baseline to a total. The order is part of the claim, so category_order is required.",
+    spec: {
+      kind: "waterfall",
+      x: { field: "component", label: "Component" },
+      y: { field: "delta", label: "Change in accuracy", unit: "pp" },
+      start: 74.2,
+      category_order: ["+ MixUp", "+ Distill", "+ EMA", "+ Longer"],
+      data: { path: "waterfall.csv" },
+    },
+  },
+  {
+    name: "head_sparklines",
+    purpose: "Many short series at once on one shared scale, where free limits would make a flat series look dramatic.",
+    spec: {
+      kind: "sparkline_grid",
+      x: { field: "step", label: "Step" },
+      y: { field: "activation", label: "Activation" },
+      group: "head",
+      columns: 4,
+      output: { size: "double_column" },
+      data: { path: "heads.csv" },
+    },
+  },
+
+  {
     name: "reliability_diagram",
     purpose:
       "Predicted probability against the frequency actually observed, with the expected calibration error printed per model.",

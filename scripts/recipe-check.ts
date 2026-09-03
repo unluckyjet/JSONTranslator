@@ -181,6 +181,27 @@ for (const [arm, scale] of [
 }
 write("survival.csv", survival);
 
+const waterfall = ["component,delta"];
+for (const [name, value] of [
+  ["+ MixUp", 1.8],
+  ["+ Distill", 3.1],
+  ["+ EMA", -0.4],
+  ["+ Longer", 0.9],
+] as const) {
+  waterfall.push(`${name},${value}`);
+}
+write("waterfall.csv", waterfall);
+
+const heads = ["head,step,activation"];
+for (let head = 0; head < 12; head += 1) {
+  let level = next() * 2 - 1;
+  for (let step = 0; step < 40; step += 1) {
+    level += (next() - 0.5) * 0.4;
+    heads.push(`head ${String(head).padStart(2, "0")},${step},${level.toFixed(4)}`);
+  }
+}
+write("heads.csv", heads);
+
 let failures = 0;
 console.log(`python: ${python}\nworkdir: ${dir}\n`);
 

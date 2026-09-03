@@ -500,6 +500,37 @@ export const ScalingFitSpec = z.object({
   show_points: z.boolean().default(true),
 });
 
+export const ConfusionMatrixSpec = z.object({
+  ...base,
+  kind: z.literal("confusion_matrix"),
+  x: AxisSpec,
+  y: AxisSpec,
+  normalize: z
+    .enum(["none", "row", "column"])
+    .describe(
+      "Required, because the three make different claims. Row-normalised reads as recall, " +
+        "column-normalised as precision, and raw counts as support.",
+    ),
+  value: z.string().min(1).optional().describe("Column holding a precomputed count. Omit to count rows."),
+  annotate_cells: z.boolean().default(true),
+});
+
+export const WaterfallSpec = z.object({
+  ...xy,
+  kind: z.literal("waterfall"),
+  start: z.number().describe("The baseline the contributions are measured from."),
+  category_order: z
+    .array(z.string().min(1))
+    .min(1)
+    .describe("Required. A waterfall is read left to right, so the order is part of the claim."),
+});
+
+export const SparklineGridSpec = z.object({
+  ...xy,
+  kind: z.literal("sparkline_grid"),
+  columns: z.int().min(1).max(12).default(4),
+});
+
 export const HeatmapSpec = z.object({
   ...base,
   kind: z.literal("heatmap"),
@@ -555,6 +586,9 @@ export const FigureSpec = z.discriminatedUnion("kind", [
   QqSpec,
   KaplanMeierSpec,
   ScalingFitSpec,
+  ConfusionMatrixSpec,
+  WaterfallSpec,
+  SparklineGridSpec,
   HeatmapSpec,
   TableSpec,
 ]);
@@ -578,6 +612,9 @@ export const FIGURE_KINDS = [
   "qq",
   "kaplan_meier",
   "scaling_fit",
+  "confusion_matrix",
+  "waterfall",
+  "sparkline_grid",
   "heatmap",
   "table",
 ] as const;
@@ -610,7 +647,8 @@ export function hasCategoricalX(spec: FigureSpec): boolean {
     spec.kind === "forest" ||
     spec.kind === "paired_difference" ||
     spec.kind === "slope" ||
-    spec.kind === "dumbbell"
+    spec.kind === "dumbbell" ||
+    spec.kind === "waterfall"
   );
 }
 

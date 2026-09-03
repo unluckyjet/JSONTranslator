@@ -36,6 +36,9 @@ const KIND_PHRASING: Record<FigureSpec["kind"], string> = {
   qq: "Quantile-quantile plot",
   kaplan_meier: "Kaplan-Meier survival curve",
   scaling_fit: "Scaling plot with a fitted power law",
+  confusion_matrix: "Confusion matrix",
+  waterfall: "Waterfall chart, each step a contribution from the one before",
+  sparkline_grid: "Grid of sparklines on a shared scale, one per series",
   heatmap: "Heatmap",
   table: "Table",
 };
@@ -137,7 +140,27 @@ export function emitAltText(spec: FigureSpec, out: string[]): void {
     "    parts = []",
   );
 
-  if (derivedAxis(spec, "y")) {
+  if (spec.kind === "confusion_matrix") {
+    // Both axes are class labels, so there is no column to average. What a
+    // reader wants is how much of the mass sits on the diagonal and which
+    // off-diagonal cell is worst.
+    out.push(
+      "    counts = frame.pivot_table(index=Y_FIELD, columns=X_FIELD, aggfunc=\"size\", fill_value=0)",
+      "    labels = sorted(set(counts.index) | set(counts.columns), key=str)",
+      "    counts = counts.reindex(index=labels, columns=labels, fill_value=0).to_numpy(dtype=float)",
+      "    total = counts.sum()",
+      "    if total:",
+      "        correct = float(np.trace(counts))",
+      '        parts.append(f"{correct / total:.1%} of {int(total)} cases fall on the diagonal")',
+      "        off = counts - np.diag(np.diag(counts))",
+      "        worst = np.unravel_index(int(np.argmax(off)), off.shape)",
+      "        if off[worst]:",
+      "            parts.append(",
+      '                f"the commonest confusion is {labels[worst[0]]} read as "',
+      '                f"{labels[worst[1]]}, {int(off[worst])} times"',
+      "            )",
+    );
+  } else if (derivedAxis(spec, "y")) {
     // The vertical axis is a proportion the script computed, so there is
     // nothing to summarise there. What a reader wants is where each
     // distribution sits, which is the median and the quartile spread.

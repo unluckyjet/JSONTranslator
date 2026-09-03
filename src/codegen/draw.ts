@@ -1021,6 +1021,179 @@ function emitScalingFit(spec: FigureSpec & { kind: "scaling_fit" }, out: string[
   );
 }
 
+function emitConfusionMatrix(
+  spec: FigureSpec & { kind: "confusion_matrix" },
+  out: string[],
+): void {
+  const counts = spec.value
+    ? 'df.pivot_table(index=Y_FIELD, columns=X_FIELD, values=VALUE_FIELD, aggfunc="sum")'
+    : "df.pivot_table(index=Y_FIELD, columns=X_FIELD, aggfunc=\"size\", fill_value=0)";
+  out.push(
+    "",
+    "def draw_panel(ax, df):",
+    `    matrix = ${counts}`,
+    "    labels = sorted(set(matrix.index) | set(matrix.columns), key=str)",
+    "    matrix = matrix.reindex(index=labels, columns=labels, fill_value=0)",
+    "    raw = matrix.to_numpy(dtype=float)",
+    "    shown = raw.copy()",
+  );
+  if (spec.normalize === "row") {
+    out.push(
+      "    # Each row sums to one, so a cell reads as recall for that true class.",
+      "    totals = raw.sum(axis=1, keepdims=True)",
+      "    shown = np.divide(raw, totals, out=np.zeros_like(raw), where=totals > 0)",
+    );
+  } else if (spec.normalize === "column") {
+    out.push(
+      "    # Each column sums to one, so a cell reads as precision for that",
+      "    # predicted class.",
+      "    totals = raw.sum(axis=0, keepdims=True)",
+      "    shown = np.divide(raw, totals, out=np.zeros_like(raw), where=totals > 0)",
+    );
+  }
+  out.push(
+    "    image = ax.imshow(shown, cmap=SEQUENTIAL_MAP, aspect=\"equal\", vmin=0, vmax=shown.max() or 1)",
+    "    ax.set_xticks(np.arange(len(labels)))",
+    "    ax.set_yticks(np.arange(len(labels)))",
+    "    ax.set_xticklabels([str(value) for value in labels])",
+    "    ax.set_yticklabels([str(value) for value in labels])",
+    "    bar = ax.figure.colorbar(image, ax=ax, fraction=0.046, pad=0.04)",
+    `    bar.set_label(${JSON.stringify(
+      spec.normalize === "none" ? "Count" : `Share of each ${spec.normalize}`,
+    )})`,
+  );
+  if (spec.annotate_cells) {
+    out.push(
+      "    # A printed number is exact where shading is estimated, and a",
+      "    # confusion matrix is usually read one cell at a time.",
+      "    threshold = (shown.max() or 1) * 0.6",
+      "    for row in range(len(labels)):",
+      "        for column in range(len(labels)):",
+      `            text = ${
+        spec.normalize === "none"
+          ? 'f"{int(raw[row, column])}"'
+          : 'f"{shown[row, column]:.2f}"'
+      }`,
+      "            ax.text(",
+      "                column,",
+      "                row,",
+      "                text,",
+      '                ha="center",',
+      '                va="center",',
+      '                color="white" if shown[row, column] > threshold else "#202020",',
+      "                fontsize=ANNOTATION_PT,",
+      "            )",
+    );
+  }
+  out.push("");
+}
+
+function emitWaterfall(spec: FigureSpec & { kind: "waterfall" }, out: string[]): void {
+  void spec;
+  // Each bar starts where the last one ended. Only the first and the total sit
+  // on the baseline, so every other bar is read by length alone, which is why
+  // the running total is printed as well as drawn.
+  out.push(
+    "",
+    "def draw_panel(ax, df):",
+    "    categories = category_order(df)",
+    "    contributions = [",
+    "        float(df[df[X_FIELD] == name][Y_FIELD].sum()) for name in categories",
+    "    ]",
+    "    running = START",
+    "    levels = [START]",
+    "    positions = np.arange(len(categories) + 1)",
+    "    for index, (name, delta) in enumerate(zip(categories, contributions)):",
+    "        bottom = min(running, running + delta)",
+    "        colour = PALETTE[0] if delta >= 0 else PALETTE[1]",
+    "        ax.bar(",
+    "            index,",
+    "            abs(delta),",
+    "            bottom=bottom,",
+    "            width=0.62,",
+    "            color=colour,",
+    "            alpha=0.85,",
+    "            linewidth=0,",
+    "            zorder=2,",
+    "        )",
+    "        if index:",
+    "            ax.plot(",
+    "                [index - 0.69, index - 0.31],",
+    "                [running, running],",
+    '                color="#9a9a9a",',
+    "                linewidth=0.8,",
+    "                zorder=1,",
+    "            )",
+    "        running += delta",
+    "        levels.append(running)",
+    "    # Autoscale measures the bars, not the baseline they are measured from,",
+    "    # so the start line and the first bar's foot fall outside the view.",
+    "    floor, ceiling = min(levels), max(levels)",
+    "    pad = 0.12 * (ceiling - floor) or 1.0",
+    "    ax.set_ylim(floor - pad, ceiling + pad)",
+    "    ax.bar(",
+    "        len(categories),",
+    "        running - START,",
+    "        bottom=START,",
+    "        width=0.62,",
+    '        color="#5a5a5a",',
+    "        alpha=0.85,",
+    "        linewidth=0,",
+    "        zorder=2,",
+    "    )",
+    '    ax.axhline(START, color="#606060", linewidth=0.9, linestyle=(0, (4, 3)), zorder=1)',
+    "    ax.set_xticks(positions)",
+    '    ax.set_xticklabels([str(value) for value in categories] + ["total"])',
+    "    print(",
+    '        f"waterfall: {START:.4g} plus {len(categories)} contributions gives {running:.4g}. "',
+    '        "The order of the steps is the order given in the spec and changes the picture."',
+    "    )",
+    "",
+  );
+}
+
+function emitSparklineGrid(spec: FigureSpec & { kind: "sparkline_grid" }, out: string[]): void {
+  out.push(
+    "",
+    "def draw_panel(ax, df):",
+    "    names = series_names(df)",
+    `    columns = min(${spec.columns}, max(len(names), 1))`,
+    "    rows = int(np.ceil(len(names) / columns)) if names else 1",
+    "    # One shared scale across every cell. Free limits would let a flat",
+    "    # series look as dramatic as a real one.",
+    "    values = df[Y_FIELD].dropna().to_numpy(dtype=float)",
+    "    low, high = (values.min(), values.max()) if len(values) else (0.0, 1.0)",
+    "    if not np.isfinite(low) or high <= low:",
+    "        low, high = low - 0.5, low + 0.5",
+    "    pad = 0.08 * (high - low)",
+    "    ax.set_axis_off()",
+    "    for index, name in enumerate(names):",
+    "        block = df[df[GROUP] == name].dropna(subset=[X_FIELD, Y_FIELD]).sort_values(X_FIELD)",
+    "        row, column = divmod(index, columns)",
+    "        cell = ax.inset_axes(",
+    "            [",
+    "                column / columns + 0.012,",
+    "                1.0 - (row + 1) / rows + 0.012,",
+    "                1.0 / columns - 0.024,",
+    "                1.0 / rows - 0.024,",
+    "            ]",
+    "        )",
+    "        cell.plot(",
+    "            block[X_FIELD],",
+    "            block[Y_FIELD],",
+    "            color=PALETTE[index % len(PALETTE)],",
+    "            linewidth=0.9,",
+    "        )",
+    "        cell.set_ylim(low - pad, high + pad)",
+    "        cell.set_xticks([])",
+    "        cell.set_yticks([])",
+    "        for side in cell.spines.values():",
+    "            side.set_visible(False)",
+    "        cell.set_title(str(name), fontsize=ANNOTATION_PT, pad=2)",
+    "",
+  );
+}
+
 function emitHeatmap(spec: FigureSpec & { kind: "heatmap" }, out: string[]): void {
   out.push(
     "",
@@ -1139,6 +1312,15 @@ export function emitDraw(spec: PlottedSpec, out: string[]): void {
       break;
     case "scaling_fit":
       emitScalingFit(spec, out);
+      break;
+    case "confusion_matrix":
+      emitConfusionMatrix(spec, out);
+      break;
+    case "waterfall":
+      emitWaterfall(spec, out);
+      break;
+    case "sparkline_grid":
+      emitSparklineGrid(spec, out);
       break;
     case "heatmap":
       emitHeatmap(spec, out);

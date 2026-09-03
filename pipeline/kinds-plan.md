@@ -20,7 +20,7 @@ typecheck at every site that must handle it.
 - [x] 1. Distribution family: `ecdf`, `raincloud`, `ridgeline`
 - [x] 2. Paired and ranked: `forest`, `paired_difference`, `slope`, `dumbbell`
 - [x] 3. Diagnostics: `calibration`, `qq`, `kaplan_meier`, `scaling_fit`
-- [ ] 4. Structure: `waterfall`, `confusion_matrix`, `sparkline_grid`
+- [x] 4. Structure: `waterfall`, `confusion_matrix`, `sparkline_grid`
 - [ ] 5. Capabilities: effect size, bank to 45, hexbin, figure diff, units
 
 ## Rules carried from the existing work
@@ -36,4 +36,4 @@ Every batch runs the seven checks and then CI before the next starts.
 
 ## Status
 
-Batches 1 to 3 shipped. Batch 4 next.
+All thirteen kinds shipped. Batch 5, the capabilities, next.

@@ -96,6 +96,15 @@ export function primaryChannel(spec: FigureSpec): Channel {
     case "kaplan_meier":
     case "scaling_fit":
       return "position_common";
+    case "confusion_matrix":
+      return "shading";
+    case "waterfall":
+      // Every bar but the first floats, so only its length is readable.
+      return "length";
+    case "sparkline_grid":
+      // Each panel has its own baseline, so a reader compares across
+      // unaligned scales even though the limits are shared.
+      return "position_nonaligned";
     case "ridgeline":
       // Rows share a baseline only with their own neighbour, so a reader
       // compares along an unaligned scale.
