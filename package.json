@@ -11,7 +11,7 @@
     "render-check": "node --experimental-strip-types scripts/render-check.ts",
     "baseline": "node --experimental-strip-types scripts/baseline.ts",
     "example-data": "node --experimental-strip-types scripts/make-example-data.ts",
-    "test:python": "python3 -m pytest python/tests -q",
+    "test:python": "node --experimental-strip-types scripts/pytest.ts",
     "recipe-check": "node --experimental-strip-types scripts/recipe-check.ts",
     "compose-check": "node --experimental-strip-types scripts/compose-check.ts"
   },
